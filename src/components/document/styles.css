@@ -1,0 +1,13 @@
+@media all and (max-width: 480px) {
+  .upload-button {
+    margin-top: 8px !important;
+    margin-left: 4px !important;
+  }
+  .document-chat-card-inner-container {
+    padding: 4px !important;
+    max-height: calc(100vh - 234px) !important;
+  }
+  .document-upload-card-inner-container {
+    border: none !important;
+  }
+}

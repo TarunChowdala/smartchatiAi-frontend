@@ -1,0 +1,248 @@
+/* Shared Utilities */
+.resume-section {
+  width: 100%;
+  margin-bottom: 2.2em;
+  padding-bottom: 1.2em;
+  border-bottom: 1.5px solid var(--resume-section-divider, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+.resume-section:last-child {
+  border-bottom: none;
+}
+.resume-side-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5em;
+  width: 100%;
+}
+.resume-side-heading {
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--resume-side-heading, #222);
+}
+.resume-dates {
+  font-size: 0.98rem;
+  color: var(--resume-dates, #6b7280);
+  min-width: 120px;
+  text-align: right;
+}
+
+/* Template 1: Modern Clean */
+.resume-template-modern {
+  --resume-section-divider: #e5e7eb;
+  --resume-side-heading: #4f46e5;
+  --resume-dates: #6366f1;
+  font-family: "Inter", Arial, sans-serif !important;
+  background: #fff !important;
+  color: #222 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 32px rgba(79, 70, 229, 0.08) !important;
+  padding: 2.5rem 2.2rem !important;
+  max-width: 820px !important;
+  margin: 2.5rem auto !important;
+}
+.resume-template-modern h1 {
+  color: #4f46e5 !important;
+  font-size: 2.4rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 0.1em !important;
+  letter-spacing: -0.01em !important;
+}
+.resume-template-modern .resume-subheading {
+  color: #6366f1 !important;
+  font-size: 1.15rem !important;
+  font-weight: 500 !important;
+  margin-bottom: 1.3em !important;
+  letter-spacing: 0.02em !important;
+}
+.resume-template-modern h2 {
+  color: #4f46e5 !important;
+  font-size: 1.35rem !important;
+  font-weight: 700 !important;
+  border-left: 4px solid #6366f1 !important;
+  padding-left: 0.7em !important;
+  margin-bottom: 0.7em !important;
+  background: linear-gradient(90deg, #f5f7ff 60%, transparent 100%) !important;
+}
+.resume-template-modern h3 {
+  color: #222 !important;
+  font-size: 1.08rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.2em !important;
+  margin-top: 0.7em !important;
+}
+.resume-template-modern ul,
+.resume-template-modern ol {
+  padding-left: 1.3em !important;
+  margin-bottom: 0.5em !important;
+}
+
+/* Template 2: Elegant Dark */
+.resume-template-dark {
+  --resume-section-divider: #27272a;
+  --resume-side-heading: #a78bfa;
+  --resume-dates: #c4b5fd;
+  font-family: "Georgia", serif !important;
+  background: #18181b !important;
+  color: #f4f4f5 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 32px rgba(167, 139, 250, 0.1) !important;
+  padding: 2.5rem 2.2rem !important;
+  max-width: 820px !important;
+  margin: 2.5rem auto !important;
+}
+.resume-template-dark h1 {
+  color: #a78bfa !important;
+  font-size: 2.4rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 0.1em !important;
+  letter-spacing: -0.01em !important;
+}
+.resume-template-dark .resume-subheading {
+  color: #c4b5fd !important;
+  font-size: 1.15rem !important;
+  font-weight: 500 !important;
+  margin-bottom: 1.3em !important;
+  letter-spacing: 0.02em !important;
+}
+.resume-template-dark h2 {
+  color: #a78bfa !important;
+  font-size: 1.35rem !important;
+  font-weight: 700 !important;
+  border-left: 4px solid #a78bfa !important;
+  padding-left: 0.7em !important;
+  margin-bottom: 0.7em !important;
+  background: linear-gradient(90deg, #232336 60%, transparent 100%) !important;
+}
+.resume-template-dark h3 {
+  color: #f4f4f5 !important;
+  font-size: 1.08rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.2em !important;
+  margin-top: 0.7em !important;
+}
+.resume-template-dark ul,
+.resume-template-dark ol {
+  padding-left: 1.3em !important;
+  margin-bottom: 0.5em !important;
+}
+
+/* Template 3: Minimalist */
+.resume-template-minimal {
+  --resume-section-divider: #e5e7eb;
+  --resume-side-heading: #2563eb;
+  --resume-dates: #64748b;
+  font-family: "Roboto", Arial, sans-serif !important;
+  background: #f9fafb !important;
+  color: #111827 !important;
+  border-radius: 10px !important;
+  border: 1.5px solid #e5e7eb !important;
+  padding: 2.2rem 2rem !important;
+  max-width: 800px !important;
+  margin: 2.5rem auto !important;
+}
+.resume-template-minimal h1 {
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 2.2rem !important;
+  margin-bottom: 0.1em !important;
+  letter-spacing: -0.01em !important;
+}
+.resume-template-minimal .resume-subheading {
+  color: #3b82f6 !important;
+  font-size: 1.08rem !important;
+  font-weight: 500 !important;
+  margin-bottom: 1.1em !important;
+  letter-spacing: 0.01em !important;
+}
+.resume-template-minimal h2 {
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  font-size: 1.18rem !important;
+  border-bottom: 2px solid #e5e7eb !important;
+  padding-bottom: 0.18em !important;
+  margin-bottom: 0.7em !important;
+  background: none !important;
+}
+.resume-template-minimal h3 {
+  color: #111827 !important;
+  font-size: 1.01rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.15em !important;
+  margin-top: 0.6em !important;
+}
+.resume-template-minimal ul,
+.resume-template-minimal ol {
+  padding-left: 1.2em !important;
+  margin-bottom: 0.5em !important;
+}
+
+/* Template 4: Classic Professional */
+.resume-template-classic {
+  --resume-section-divider: #4a4e69;
+  --resume-side-heading: #22223b;
+  --resume-dates: #4a4e69;
+  font-family: "Times New Roman", Times, serif !important;
+  background: #fff !important;
+  color: #22223b !important;
+  border: 2.5px solid #4a4e69 !important;
+  border-radius: 0 !important;
+  padding: 2.2rem 2rem !important;
+  max-width: 800px !important;
+  margin: 2.5rem auto !important;
+}
+.resume-template-classic h1 {
+  color: #22223b !important;
+  border-bottom: 2px solid #4a4e69 !important;
+  padding-bottom: 0.18em !important;
+  margin-bottom: 0.1em !important;
+  font-size: 2.2rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+}
+.resume-template-classic .resume-subheading {
+  color: #4a4e69 !important;
+  font-size: 1.08rem !important;
+  font-weight: 500 !important;
+  margin-bottom: 1.1em !important;
+  letter-spacing: 0.01em !important;
+}
+.resume-template-classic h2 {
+  color: #22223b !important;
+  border-bottom: 2px solid #4a4e69 !important;
+  padding-bottom: 0.18em !important;
+  margin-bottom: 0.7em !important;
+  font-size: 1.18rem !important;
+  font-weight: 700 !important;
+  background: none !important;
+}
+.resume-template-classic h3 {
+  color: #22223b !important;
+  font-size: 1.01rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.15em !important;
+  margin-top: 0.6em !important;
+}
+.resume-template-classic ul,
+.resume-template-classic ol {
+  padding-left: 1.2em !important;
+  margin-bottom: 0.5em !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .resume-template-modern,
+  .resume-template-dark,
+  .resume-template-minimal,
+  .resume-template-classic {
+    padding: 1.1rem 0.5rem !important;
+    max-width: 100% !important;
+  }
+  .resume-section {
+    padding-bottom: 0.7em;
+    margin-bottom: 1.1em;
+  }
+}

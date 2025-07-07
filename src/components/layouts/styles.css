@@ -1,0 +1,5 @@
+@media all and (max-width: 768px) {
+  .dashboard-layout-container {
+    padding-top: 4rem;
+  }
+}

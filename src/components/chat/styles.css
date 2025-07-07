@@ -1,0 +1,25 @@
+@media all and (max-width: 767px) {
+}
+
+@media all and (max-width: 480px) {
+  .chatbot-main-container {
+    padding: 0px !important;
+  }
+  .card-container {
+    border: none !important;
+    max-height: calc(100vh - -5px) !important;
+  }
+  .card-inner-container {
+    padding: 4px !important;
+  }
+  .message-item {
+    gap: 4px !important;
+    flex-direction: column !important;
+  }
+  .input-element-container {
+    padding: 4px 6px !important;
+  }
+  .message-item-bot {
+    min-width: 95vw !important;
+  }
+}
