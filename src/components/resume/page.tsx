@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Download,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,7 @@ import toast, { Toaster } from "react-hot-toast";
 import api from "@/lib/api";
 import html2pdf from "html2pdf.js";
 import "./styles.css";
-import { parse } from "html-react-parser";
+// import { parse } from "html-react-parser";
 
 type AnalysisResult = {
   score: number;
@@ -121,13 +122,9 @@ export default function ResumePage() {
       setAnalysisResult(transformedResult);
     } catch (error: any) {
       console.error("Analysis error:", error);
-      toast.error(
-        error.response?.data?.detail ||
-          "Failed to analyze resume. Please try again.",
-        {
-          duration: 2000,
-        }
-      );
+      toast.error("Failed to analyze resume. Please try again.", {
+        duration: 2000,
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -157,6 +154,12 @@ export default function ResumePage() {
           duration: 2000,
         });
         setShowTemplate(true);
+        if (editableDivRef.current) {
+          editableDivRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
       }
       setGeneratingResume(false);
     } catch (error: any) {
@@ -177,6 +180,9 @@ export default function ResumePage() {
     setAnalysisResult(null);
     setShowTemplate(false);
     setAiGeneratedResumeHtml("");
+    setJobDescription("");
+    localStorage.removeItem("resume_text");
+    localStorage.removeItem("jd");
     if (resumeInputRef.current) {
       resumeInputRef.current.value = "";
     }
@@ -198,6 +204,13 @@ export default function ResumePage() {
   useEffect(() => {
     transformResumeHtml(aiGeneratedResumeHtml);
   }, [aiGeneratedResumeHtml]);
+
+  useEffect(() => {
+    return () => {
+      localStorage.removeItem("resume_text");
+      localStorage.removeItem("jd");
+    };
+  }, []);
 
   function transformResumeHtml(rawHtml: string): string {
     // Use DOMParser to parse the HTML string
@@ -385,7 +398,7 @@ export default function ResumePage() {
                   animate={{ opacity: 1, y: 0 }}
                   className="w-50"
                 >
-                  <Card>
+                  <Card style={{ width: "50%" }}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -413,9 +426,14 @@ export default function ResumePage() {
                           disabled={isAnalyzing || !jobDescription.trim()}
                           className="w-full"
                         >
-                          {isAnalyzing
-                            ? "Analyzing..."
-                            : "Analyze Resume vs Job Description"}
+                          {isAnalyzing ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : (
+                            "Analyze Resume vs Job Description"
+                          )}
                         </Button>
                       </div>
 
@@ -592,6 +610,7 @@ export default function ResumePage() {
                               setResumeMode("jd_resume");
                             }}
                             className="accent-primary"
+                            style={{ width: "1rem", height: "1rem" }}
                           />
                           <span className="text-sm">
                             Create Resume According to JD
@@ -607,36 +626,64 @@ export default function ResumePage() {
                               setResumeMode("enhance_resume");
                             }}
                             className="accent-primary"
+                            style={{ width: "1rem", height: "1rem" }}
                           />
                           <span className="text-sm">
                             Enhance Your Current Resume
                           </span>
                         </label>
                       </fieldset>
-                    </div>
-                    <Button
-                      variant="default"
-                      onClick={() => {
-                        generateResumeTemplate();
-                      }}
-                      type="button"
-                      className="w-full"
-                      disabled={generatingResume}
-                    >
-                      {generatingResume ? (
-                        <>
-                          <span className="mr-2 inline-block align-middle">
-                            <span className="inline-block w-5 h-5 border-2 border-t-2 border-primary border-t-transparent rounded-full animate-spin"></span>
-                          </span>
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="mr-2 h-5 w-5" />
-                          Generate AI powered resume.
-                        </>
+                      <Button
+                        variant="default"
+                        onClick={() => {
+                          generateResumeTemplate();
+                        }}
+                        type="button"
+                        className="w-full mt-3"
+                        disabled={generatingResume}
+                      >
+                        {generatingResume ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-5 w-5" />
+                            Generate AI powered resume.
+                          </>
+                        )}
+                      </Button>
+                      {resumeMode === "jd_resume" && (
+                        <div className="w-full mt-3">
+                          <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 text-yellow-800 text-xs rounded px-3 py-2">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4 text-yellow-500 flex-shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 9v2m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"
+                              />
+                            </svg>
+                            <span>
+                              <strong>Note:</strong> Generating a resume
+                              "According to JD" will create a new resume
+                              tailored to the job description, which may include
+                              skills and content inferred from the JD and your
+                              uploaded resume. Please review and edit the
+                              generated resume to ensure it accurately reflects
+                              your real experience and skills.
+                            </span>
+                          </div>
+                        </div>
                       )}
-                    </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -748,29 +795,61 @@ export default function ResumePage() {
                       Classic
                     </Button>
                   </div>
-                  <div
-                    ref={editableDivRef}
-                    className={`prose prose-sm dark:prose-invert border rounded-md p-4 bg-background text-foreground min-h-[400px] transition-colors duration-300 border-muted ${
-                      selectedTemplate === "modern"
-                        ? "resume-template-modern"
-                        : selectedTemplate === "dark"
-                        ? "resume-template-dark"
-                        : selectedTemplate === "minimal"
-                        ? "resume-template-minimal"
-                        : "resume-template-classic"
-                    }`}
-                    contentEditable={true}
-                    suppressContentEditableWarning={true}
-                    onInput={(e) =>
-                      setAiGeneratedResumeHtml(e.currentTarget.innerHTML)
-                    }
-                    dangerouslySetInnerHTML={{ __html: aiGeneratedResumeHtml }}
-                    style={{ outline: "none", cursor: "text" }}
-                  />
-                  <div className="text-xs text-muted-foreground mt-2">
-                    Click and edit your resume above. When ready, click
-                    "Download PDF".
-                  </div>
+                  {generatingResume ? (
+                    <div className="flex flex-col items-center justify-center min-h-[400px]">
+                      <svg
+                        className="animate-spin h-8 w-8 text-purple-500 mb-2"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        ></path>
+                      </svg>
+                      <span className="text-sm text-muted-foreground">
+                        Generating your resume...
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        ref={editableDivRef}
+                        className={`prose prose-sm dark:prose-invert border rounded-md p-4 bg-background text-foreground min-h-[400px] transition-colors duration-300 border-muted ${
+                          selectedTemplate === "modern"
+                            ? "resume-template-modern"
+                            : selectedTemplate === "dark"
+                            ? "resume-template-dark"
+                            : selectedTemplate === "minimal"
+                            ? "resume-template-minimal"
+                            : "resume-template-classic"
+                        }`}
+                        contentEditable={true}
+                        suppressContentEditableWarning={true}
+                        onInput={(e) =>
+                          setAiGeneratedResumeHtml(e.currentTarget.innerHTML)
+                        }
+                        dangerouslySetInnerHTML={{
+                          __html: aiGeneratedResumeHtml,
+                        }}
+                        style={{ outline: "none", cursor: "text" }}
+                      />
+                      <div className="text-xs text-muted-foreground mt-2">
+                        Click and edit your resume above. When ready, click
+                        "Download PDF".
+                      </div>
+                    </>
+                  )}
                 </CardContent>
                 <Toaster />
               </Card>
