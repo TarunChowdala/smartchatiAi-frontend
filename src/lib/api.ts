@@ -41,42 +41,36 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
+        // Use Firebase SDK to refresh token since user is signed in
         const auth = getAuth();
-        const user = await new Promise((resolve) => {
-          const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-            unsubscribe();
-            resolve(firebaseUser);
-          });
-        });
+        const user = auth.currentUser;
 
-        if (window.location.pathname.includes("/login")) {
-          return Promise.reject(error);
-        }
-        console.log(user, "user is null or undefined");
-        if (!user) {
-          redirectToLogin();
-          return Promise.reject(error);
-        }
-
-        // Try to refresh the token
-        try {
+        if (user) {
+          if (window.location.pathname.includes("/login")) {
+            return Promise.reject(error);
+          }
           const newToken = await user.getIdToken(true);
           localStorage.setItem("token", newToken);
 
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
-
           return api(originalRequest);
-        } catch (refreshError) {
+        } else {
+          // No user signed in, redirect to login
           localStorage.removeItem("token");
-          window.location.href = "/login";
-          return Promise.reject(refreshError);
+          localStorage.removeItem("refreshToken");
+          if (!window.location.pathname.includes("/login")) {
+            window.location.href = "/login";
+          }
+          return Promise.reject(error);
         }
-      } catch (error) {
+      } catch (refreshError) {
+        // Refresh failed, redirect to login
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
         if (!window.location.pathname.includes("/login")) {
-          localStorage.removeItem("token");
           window.location.href = "/login";
         }
-        return Promise.reject(error);
+        return Promise.reject(refreshError);
       }
     }
 

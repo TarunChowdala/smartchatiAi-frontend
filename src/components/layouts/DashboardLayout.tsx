@@ -45,6 +45,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  console.log(profile, "profile");
 
   const navigation = [
     { name: "Home", path: "/dashboard", icon: Home },
@@ -56,6 +57,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     navigate("/login");
   };
 
@@ -91,8 +93,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <SidebarFooter className="p-4">
             <div className="flex items-center gap-2">
               <Avatar>
-                <AvatarImage src="https://github.com/shadcn.png" />
-                <AvatarFallback>U</AvatarFallback>
+                <AvatarImage
+                  src={
+                    profile?.profileImage ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      profile?.name ?? ""
+                    )}&background=random&color=fff`
+                  }
+                />
+                <AvatarFallback>
+                  {(profile?.name && profile.name[0].toUpperCase()) || "U"}
+                </AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
                 <span className="text-sm font-medium">{profile?.name}</span>
@@ -191,7 +202,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       className="relative h-8 w-8 rounded-full bg-accent/50 hover:bg-accent"
                     >
                       <Avatar className="h-9 w-9">
-                        <AvatarImage src="https://github.com/shadcn.png" />
+                        <AvatarImage
+                          src={
+                            profile?.profileImage ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                              profile?.name ?? ""
+                            )}&background=random&color=fff`
+                          }
+                        />
                         <AvatarFallback>U</AvatarFallback>
                       </Avatar>
                     </Button>

@@ -171,7 +171,10 @@ const MessageContent: React.FC<MessageContentProps> = ({
 
     // Tables with better styling
     table: ({ children }) => (
-      <div className="overflow-x-auto my-4 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div
+        className="overflow-x-auto my-4 rounded-lg border border-gray-200 dark:border-gray-700"
+        style={{ maxWidth: "100%" }}
+      >
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           {children}
         </table>
@@ -257,6 +260,10 @@ const MessageContent: React.FC<MessageContentProps> = ({
     hr: () => <hr className="my-6 border-gray-200 dark:border-gray-700" />,
   };
 
+  function preprocessContent(text: string) {
+    return text.replace(/\n/g, "  \n");
+  }
+
   return (
     <>
       <div
@@ -272,7 +279,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
             rehypePlugins={[rehypeKatex]}
             components={components}
           >
-            {displayedContent}
+            {preprocessContent(displayedContent)}
           </ReactMarkdown>
           {isTyping && (
             <span className="inline-block w-2 h-4 bg-gray-500 dark:bg-gray-400 animate-pulse ml-1" />

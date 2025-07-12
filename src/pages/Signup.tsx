@@ -7,6 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Brain, Eye, EyeOff, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import toast, { Toaster } from "react-hot-toast";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { useProfile } from "@/components/ProfileContext";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -34,6 +38,7 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const navigate = useNavigate();
+  const { setProfile } = useProfile();
 
   const debouncedConfirmPassword = useDebounce(confirmPassword, 500);
 
@@ -55,39 +60,67 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      const response = await api.post("/auth/signup", {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
         email,
-        password,
-        name,
-      });
-      toast.success("Account created successfully!", {
-        duration: 2000,
-        position: "top-right",
-        style: {
-          background: "#333",
-          color: "#fff",
-        },
-      });
-      navigate("/login");
-    } catch (error: any) {
-      console.log(error, "errro");
-      if (error.response?.status === 400) {
-        toast.error("Please check your email and password format.", {
+        password
+      );
+      const idToken = await userCredential.user.getIdToken();
+      const uid = userCredential.user.uid;
+      console.log("Firebase account created successfully, UID:", uid);
+
+      // calling signup api to store user in users table
+      try {
+        const response = await api.post("/auth/signup", {
+          email,
+          password,
+          name,
+          uid: uid,
+          idToken: idToken,
+          about: "",
+        });
+
+        toast.success("Account created successfully!", {
           duration: 2000,
           position: "top-right",
-          style: {
-            background: "#333",
-            color: "#fff",
-          },
+        });
+        navigate("/login");
+      } catch (backendError: any) {
+        console.error("Backend signup failed:", backendError);
+
+        //delete the Firebase account if backend fails
+        await userCredential.user.delete();
+
+        toast.error("Account creation failed. Please try again.", {
+          duration: 2000,
+        });
+      }
+    } catch (error: any) {
+      console.log(error, "error");
+
+      // Handling Firebase auth errors
+      if (error.code === "auth/email-already-in-use") {
+        toast.error("Email is already registered. Please try logging in.", {
+          duration: 2000,
+        });
+      } else if (error.code === "auth/weak-password") {
+        toast.error(
+          "Password is too weak. Please choose a stronger password.",
+          {
+            duration: 2000,
+          }
+        );
+      } else if (error.code === "auth/invalid-email") {
+        toast.error("Invalid email format. Please check your email.", {
+          duration: 2000,
+        });
+      } else if (error.response?.status === 400) {
+        toast.error("Please check your email and password format.", {
+          duration: 2000,
         });
       } else if (error.response?.status === 500) {
         toast.error("Server error. Please try again later.", {
           duration: 2000,
-          position: "top-right",
-          style: {
-            background: "#333",
-            color: "#fff",
-          },
         });
       } else {
         if (error?.response && error?.response?.data.detail) {
@@ -96,26 +129,84 @@ export default function SignupPage() {
               "An unexpected error occurred. Please try again.",
             {
               duration: 2000,
-              position: "top-right",
-              style: {
-                background: "#333",
-                color: "#fff",
-              },
             }
           );
           return;
         }
         toast.error("An unexpected error occurred. Please try again.", {
           duration: 2000,
-          position: "top-right",
-          style: {
-            background: "#333",
-            color: "#fff",
-          },
         });
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const idToken = await user.getIdToken();
+      const uid = user.uid;
+      const name = user.displayName;
+      const email = user.email;
+      const profileImage = user.photoURL;
+      const isNewUser = (result as any)?._tokenResponse?.isNewUser ?? false;
+      const refreshToken = (result as any)?._tokenResponse?.refreshToken;
+      if (isNewUser) {
+        try {
+          await api.post("/auth/google-signup", {
+            email,
+            name,
+            uid,
+            idToken,
+            profileImage,
+          });
+          toast.success("Successfully signed up with Google.", {
+            duration: 2000,
+          });
+          localStorage.setItem("token", idToken);
+          localStorage.setItem("refreshToken", refreshToken);
+          setTimeout(() => {
+            navigate("/dashboard");
+          }, 1000);
+          getProfileDetails();
+        } catch {
+          await user.delete();
+          toast.error("Account creation failed. Please try again.", {
+            duration: 2000,
+          });
+          return;
+        }
+      }
+      if (!isNewUser) {
+        toast.success("Successfully signed up with Google.", {
+          duration: 2000,
+        });
+        localStorage.setItem("token", idToken);
+        localStorage.setItem("refreshToken", refreshToken);
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 2000);
+        getProfileDetails;
+      }
+    } catch (error: any) {
+      toast.error("Google sign-in failed. Please try again.", {
+        duration: 2000,
+      });
+      console.error(error);
+    }
+  };
+
+  const getProfileDetails = async () => {
+    try {
+      const response = await api.get("/auth/me");
+      if (response?.data) {
+        setProfile(response.data);
+      }
+    } catch (err) {
+      console.log(err, "err");
     }
   };
 
@@ -211,6 +302,20 @@ export default function SignupPage() {
               ) : (
                 "Sign up"
               )}
+            </Button>
+            <Button
+              type="button"
+              className="w-full flex items-center justify-center gap-2"
+              variant="outline"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+            >
+              <img
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                alt="Google"
+                className="h-5 w-5"
+              />
+              Sign up with Google
             </Button>
             <div className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}

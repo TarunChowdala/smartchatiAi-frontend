@@ -24,12 +24,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@radix-ui/react-dropdown-menu";
+// import {
+//   DropdownMenu,
+//   DropdownMenuContent,
+//   DropdownMenuItem,
+//   DropdownMenuTrigger,
+// } from "@radix-ui/react-dropdown-menu";
 // import { CardHeader } from "../ui/card";
 import api from "@/lib/api";
 import MessageContent from "./MessageContent";
@@ -54,6 +54,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../../lib/firebase";
 import { useCurrentSession, Message } from "../CurrentSession";
+import { auth } from "@/lib/firebase";
 
 interface ModelOption {
   id: string;
@@ -101,6 +102,7 @@ export default function ChatPage() {
     isChatStarted,
     setIsChatStarted,
   } = useCurrentSession();
+
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   // const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
@@ -186,6 +188,7 @@ export default function ChatPage() {
     const session_ref = doc(db, "sessions", session_id);
 
     // Step 1: Create session doc with session_name
+
     await setDoc(session_ref, {
       session_id,
       user_id: profile?.id,
@@ -298,15 +301,15 @@ export default function ChatPage() {
   };
 
   const handleStartChat = async (session_name: any, firstMessage: any) => {
-    const sessionId = await startNewSession(session_name, firstMessage);
+    const sessionId = await startNewSession(session_name, input);
     setCurrentSessionId(sessionId);
     setIsChatStarted(true);
 
-    setTimeout(() => {
-      if (formRef.current) {
-        formRef.current.requestSubmit();
-      }
-    }, 100);
+    // setTimeout(() => {
+    //   if (formRef.current) {
+    //     formRef.current.requestSubmit();
+    //   }
+    // }, 100);
   };
 
   if (!isChatStarted) {
@@ -396,25 +399,25 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="w-full px-4 md:px-6 lg:px-8 flex flex-col py-6 chatbot-main-container">
+    <div className="w-full px-8 md:px-16 lg:px-24 flex flex-col chatbot-main-container">
       <Toaster />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className="mb-4"
       >
-        {window.innerWidth > 480 && (
+        {/* {window.innerWidth > 480 && (
           <>
             <h1 className="text-2xl font-bold">AI Chat</h1>
             <p className="text-muted-foreground">
               Chat with our AI assistant about anything.
             </p>
           </>
-        )}
+        )} */}
       </motion.div>
       <Card
-        className="flex-1 overflow-hidden flex flex-col card-container"
-        style={{ maxHeight: "calc(100vh - 8rem)" }}
+        className="flex-1 overflow-hidden flex flex-col card-container border-none"
+        style={{ maxHeight: "calc(100vh - 5rem)" }}
       >
         <CardContent
           ref={chatContainerRef}
@@ -433,7 +436,7 @@ export default function ChatPage() {
                 }`}
               >
                 <div
-                  className={`message-item flex gap-3 max-w-[80%] ${
+                  className={`message-item flex gap-3 max-w-[90%] ${
                     message.sender === "user"
                       ? "flex-row-reverse"
                       : "message-item-bot"
@@ -459,7 +462,7 @@ export default function ChatPage() {
                     </Avatar>
                   )}
 
-                  <div>
+                  <div style={{ maxWidth: "100%" }}>
                     <div
                       className={`rounded-lg px-2 ${
                         message.sender === "user"
@@ -527,10 +530,10 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </CardContent>
         <div
-          className="p-4 border-t input-element-container"
+          className="p-4 input-element-container"
           style={{ position: "relative" }}
         >
-          {window.innerWidth <= 480 && (
+          {/* {window.innerWidth <= 480 && (
             <div className="flex items-center gap-2 md:hidden">
               <DropdownMenu
                 open={isModelMenuOpen}
@@ -576,7 +579,7 @@ export default function ChatPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-          )}
+          )} */}
 
           <form
             ref={formRef}
@@ -584,7 +587,7 @@ export default function ChatPage() {
             className="flex flex-col gap-2"
           >
             <div className="flex gap-2">
-              {window.innerWidth > 480 && (
+              {/* {window.innerWidth > 480 && (
                 <DropdownMenu
                   open={isModelMenuOpen}
                   onOpenChange={setIsModelMenuOpen}
@@ -629,8 +632,75 @@ export default function ChatPage() {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )}
-
+              )} */}
+              {/* <input
+                type="file"
+                id="chat-file-upload"
+                style={{ display: "none" }}
+                multiple={false}
+                disabled={isLoading}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  // You can handle the file upload here, e.g., send to backend or display a preview
+                  toast.loading("Uploading file...", { id: "file-upload" });
+                  try {
+                    // Example: convert file to base64 (or send as FormData to backend)
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                      const fileData = event.target?.result;
+                      // Here you could send fileData to your backend or handle as needed
+                      // For demonstration, just append a message with file name
+                      setMessages((prev) => [
+                        ...prev,
+                        {
+                          id: uuidv4(),
+                          sender: "user",
+                          content: `Uploaded file: ${file.name}`,
+                          createdAt: new Date().toISOString(),
+                        },
+                      ]);
+                      toast.success("File uploaded!", { id: "file-upload" });
+                    };
+                    reader.onerror = () => {
+                      toast.error("Failed to read file.", {
+                        id: "file-upload",
+                      });
+                    };
+                    reader.readAsDataURL(file);
+                  } catch (err) {
+                    toast.error("File upload failed.", { id: "file-upload" });
+                  } finally {
+                    e.target.value = "";
+                  }
+                }}
+              /> */}
+              {/* <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                disabled={isLoading}
+                onClick={() => {
+                  document.getElementById("chat-file-upload")?.click();
+                }}
+                title="Attach file"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 10-5.657-5.657l-8.485 8.485a6 6 0 108.485 8.485l6.364-6.364"
+                  />
+                </svg>
+                <span className="sr-only">Attach file</span>
+              </Button> */}
               <Input
                 value={input}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>

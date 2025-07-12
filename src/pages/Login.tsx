@@ -8,6 +8,8 @@ import { Brain, Eye, EyeOff, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import toast, { Toaster } from "react-hot-toast";
 import { useProfile } from "@/components/ProfileContext";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const { setProfile } = useProfile();
@@ -45,9 +47,10 @@ export default function LoginPage() {
         password: userData.password,
       });
       if (response?.data) {
-        // Store the token in localStorage
+        // Store the tokens in localStorage
         const token = response.data.idToken;
         localStorage.setItem("token", response.data.idToken);
+        localStorage.setItem("refreshToken", response.data.refreshToken);
 
         // Show success message
         toast.success("Login successful!", {
@@ -87,6 +90,64 @@ export default function LoginPage() {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const idToken = await user.getIdToken();
+      const uid = user.uid;
+      const name = user.displayName;
+      const email = user.email;
+      const profileImage = user.photoURL;
+      const isNewUser = (result as any)?._tokenResponse?.isNewUser ?? false;
+      const refreshToken = (result as any)?._tokenResponse?.refreshToken;
+      if (isNewUser) {
+        try {
+          await api.post("/auth/google-signup", {
+            email,
+            name,
+            uid,
+            idToken,
+            profileImage,
+          });
+          toast.success("Successfully signed up with Google.", {
+            duration: 2000,
+          });
+          localStorage.setItem("token", idToken);
+          localStorage.setItem("refreshToken", refreshToken);
+          setTimeout(() => {
+            navigate("/dashboard");
+          }, 2000);
+          getProfileDetails();
+        } catch {
+          await user.delete();
+          toast.error("Account creation failed. Please try again.", {
+            duration: 2000,
+          });
+          return;
+        }
+      }
+      if (!isNewUser) {
+        toast.success("Successfully signed up with Google.", {
+          duration: 2000,
+        });
+        localStorage.setItem("token", idToken);
+        localStorage.setItem("refreshToken", refreshToken);
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 2000);
+        getProfileDetails();
+      }
+    } catch (error: any) {
+      toast.error("Google sign-in failed. Please try again.", {
+        duration: 2000,
+      });
+      console.error(error);
+    } finally {
     }
   };
 
@@ -150,6 +211,20 @@ export default function LoginPage() {
               ) : (
                 "Log in"
               )}
+            </Button>
+            <Button
+              type="button"
+              className="w-full flex items-center justify-center gap-2"
+              variant="outline"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+            >
+              <img
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                alt="Google"
+                className="h-5 w-5"
+              />
+              Continue with Google
             </Button>
             <div className="text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
