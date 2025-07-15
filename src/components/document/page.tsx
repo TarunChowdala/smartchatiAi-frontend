@@ -238,14 +238,14 @@ export default function DocumentChatPage() {
             </p>
           </div>
         )}
-        {window.innerWidth <= 480 && !uploadedFile && (
+        {/* {window.innerWidth <= 480 && !uploadedFile && (
           <div>
             <h1 className="text-2xl font-bold">Document Chat</h1>
             <p className="text-muted-foreground">
               Upload a document and chat about its contents.
             </p>
           </div>
-        )}
+        )} */}
 
         {uploadedFile && (
           <Button

@@ -120,7 +120,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="fixed top-0 left-0 right-0 z-50 flex h-16 items-center justify-between border-b bg-background px-4">
             <div className="flex items-center gap-2 font-bold">
               <Brain className="h-6 w-6" />
-              <span>AI Assistant</span>
+              <span>SmartChat AI</span>
             </div>
             <div className="flex items-center gap-2">
               <ModeToggle />
