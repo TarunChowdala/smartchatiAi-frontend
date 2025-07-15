@@ -184,6 +184,10 @@ export default function ChatPage() {
   // }, []);
 
   const startNewSession = async (session_name: any, message: any) => {
+    if (!profile?.id) {
+      throw new Error("User profile not loaded. Please wait and try again.");
+    }
+
     const session_id = uuidv4();
     const session_ref = doc(db, "sessions", session_id);
 
@@ -191,7 +195,7 @@ export default function ChatPage() {
 
     await setDoc(session_ref, {
       session_id,
-      user_id: profile?.id,
+      user_id: profile.id,
       session_name,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp(),
@@ -214,6 +218,13 @@ export default function ChatPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
+    
+    if (!profile?.id) {
+      toast.error("User profile not loaded. Please wait and try again.", {
+        duration: 2000,
+      });
+      return;
+    }
 
     // Add user message
     const userMessage: Message = {
@@ -250,7 +261,7 @@ export default function ChatPage() {
 
     try {
       const response = await api.post("/chat/send-message", {
-        user_id: profile?.id,
+        user_id: profile.id,
         message: input,
         model_name: selectedModel,
         session_id: currentSessionId,
@@ -301,15 +312,21 @@ export default function ChatPage() {
   };
 
   const handleStartChat = async (session_name: any, firstMessage: any) => {
-    const sessionId = await startNewSession(session_name, input);
-    setCurrentSessionId(sessionId);
-    setIsChatStarted(true);
+    try {
+      const sessionId = await startNewSession(session_name, input);
+      setCurrentSessionId(sessionId);
+      setIsChatStarted(true);
 
-    // setTimeout(() => {
-    //   if (formRef.current) {
-    //     formRef.current.requestSubmit();
-    //   }
-    // }, 100);
+      // setTimeout(() => {
+      //   if (formRef.current) {
+      //     formRef.current.requestSubmit();
+      //   }
+      // }, 100);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to start chat session", {
+        duration: 2000,
+      });
+    }
   };
 
   if (!isChatStarted) {
