@@ -331,7 +331,7 @@ export default function ResumePage() {
             </p>
           </div>
         )}
-        {window.innerWidth <= 480 && !uploadedResume && (
+        {/* {window.innerWidth <= 480 && !uploadedResume && (
           <div>
             <h1 className="text-2xl font-bold">Resume Analyzer & Generator</h1>
             <p className="text-muted-foreground">
@@ -339,12 +339,12 @@ export default function ResumePage() {
               analysis and AI-generated resume template.
             </p>
           </div>
-        )}
+        )} */}
       </motion.div>
 
       {!analysisResult ? (
         <Card className="flex-1 flex flex-col">
-          <CardContent className="flex flex-col items-center justify-center h-full p-6">
+          <CardContent className="flex flex-col items-center justify-center h-full p-6 resume-card-content">
             <div className="w-full max-w-6xl space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Job Description Input */}
@@ -401,9 +401,9 @@ export default function ResumePage() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="w-50"
+                  // className="w-50"
                 >
-                  <Card style={{ width: "50%" }}>
+                  <Card className="w-full md:w-1/2">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
