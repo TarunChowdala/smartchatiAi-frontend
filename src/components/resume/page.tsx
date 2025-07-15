@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 
 import { useState, useRef, useEffect } from "react";
@@ -49,6 +47,7 @@ export default function ResumePage() {
   const [showTemplate, setShowTemplate] = useState(false);
   const [aiGeneratedResumeHtml, setAiGeneratedResumeHtml] =
     useState<string>("");
+  const [isInitialized, setIsInitialized] = useState(false);
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const editableDivRef = useRef<HTMLDivElement>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<
@@ -180,6 +179,7 @@ export default function ResumePage() {
     setAnalysisResult(null);
     setShowTemplate(false);
     setAiGeneratedResumeHtml("");
+    setIsInitialized(false);
     setJobDescription("");
     localStorage.removeItem("resume_text");
     localStorage.removeItem("jd");
@@ -202,8 +202,13 @@ export default function ResumePage() {
   };
 
   useEffect(() => {
-    transformResumeHtml(aiGeneratedResumeHtml);
-  }, [aiGeneratedResumeHtml]);
+    if (aiGeneratedResumeHtml && !isInitialized && editableDivRef.current) {
+      editableDivRef.current.innerHTML = transformResumeHtml(
+        aiGeneratedResumeHtml
+      );
+      setIsInitialized(true);
+    }
+  }, [aiGeneratedResumeHtml, isInitialized]);
 
   useEffect(() => {
     return () => {
@@ -766,23 +771,29 @@ export default function ResumePage() {
                       variant={
                         selectedTemplate === "modern" ? "default" : "outline"
                       }
-                      onClick={() => setSelectedTemplate("modern")}
+                      onClick={() => {
+                        setSelectedTemplate("modern");
+                        setIsInitialized(false);
+                      }}
                     >
                       Modern
                     </Button>
-                    <Button
+                    {/* <Button
                       variant={
                         selectedTemplate === "dark" ? "default" : "outline"
                       }
                       onClick={() => setSelectedTemplate("dark")}
                     >
                       Dark
-                    </Button>
+                    </Button> */}
                     <Button
                       variant={
                         selectedTemplate === "minimal" ? "default" : "outline"
                       }
-                      onClick={() => setSelectedTemplate("minimal")}
+                      onClick={() => {
+                        setSelectedTemplate("minimal");
+                        setIsInitialized(false);
+                      }}
                     >
                       Minimal
                     </Button>
@@ -790,7 +801,10 @@ export default function ResumePage() {
                       variant={
                         selectedTemplate === "classic" ? "default" : "outline"
                       }
-                      onClick={() => setSelectedTemplate("classic")}
+                      onClick={() => {
+                        setSelectedTemplate("classic");
+                        setIsInitialized(false);
+                      }}
                     >
                       Classic
                     </Button>
@@ -836,11 +850,8 @@ export default function ResumePage() {
                         }`}
                         contentEditable={true}
                         suppressContentEditableWarning={true}
-                        onInput={(e) =>
-                          setAiGeneratedResumeHtml(e.currentTarget.innerHTML)
-                        }
-                        dangerouslySetInnerHTML={{
-                          __html: aiGeneratedResumeHtml,
+                        onInput={(e) => {
+                          setAiGeneratedResumeHtml(e.currentTarget.innerHTML);
                         }}
                         style={{ outline: "none", cursor: "text" }}
                       />
@@ -851,7 +862,7 @@ export default function ResumePage() {
                     </>
                   )}
                 </CardContent>
-                <Toaster />
+                <Toaster position="top-right" />
               </Card>
             </motion.div>
           )}

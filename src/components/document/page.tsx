@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import "./styles.css";
 import { useState, useRef, useEffect } from "react";
@@ -226,7 +224,7 @@ export default function DocumentChatPage() {
         uploadedFile ? "chatbot-main-container" : ""
       }`}
     >
-      <Toaster />
+      <Toaster position="top-right" />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

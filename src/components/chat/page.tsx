@@ -400,7 +400,7 @@ export default function ChatPage() {
 
   return (
     <div className="w-full px-8 md:px-16 lg:px-24 flex flex-col chatbot-main-container">
-      <Toaster />
+      <Toaster position="top-right" />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

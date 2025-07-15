@@ -325,7 +325,7 @@ export default function SignupPage() {
             </div>
           </form>
         </CardContent>
-        <Toaster />
+        <Toaster position="top-right" />
       </Card>
     </div>
   );

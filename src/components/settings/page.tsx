@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
@@ -197,7 +195,9 @@ export default function SettingsPage() {
         <Tabs defaultValue="account" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="account">Account</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
+            {profile?.password && (
+              <TabsTrigger value="security">Security</TabsTrigger>
+            )}
             {/* <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="privacy">Privacy</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger> */}

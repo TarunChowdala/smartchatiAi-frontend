@@ -235,7 +235,7 @@ export default function LoginPage() {
           </form>
         </CardContent>
       </Card>
-      <Toaster />
+      <Toaster position="top-right" />
     </div>
   );
 }

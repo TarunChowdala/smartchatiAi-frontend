@@ -210,7 +210,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             )}&background=random&color=fff`
                           }
                         />
-                        <AvatarFallback>U</AvatarFallback>
+                        <AvatarFallback>
+                          {" "}
+                          {(profile?.name && profile.name[0].toUpperCase()) ||
+                            "U"}
+                        </AvatarFallback>
                       </Avatar>
                     </Button>
                   </PopoverTrigger>

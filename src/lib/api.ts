@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getAuth } from "firebase/auth";
 
 const redirectToLogin = () => {
   localStorage.removeItem("token");
@@ -8,8 +8,13 @@ const redirectToLogin = () => {
   }
 };
 
+const url =
+  window.location.hostname === "localhost"
+    ? "http://localhost:8000/"
+    : "https://smartchatai-fastapi.onrender.com/";
+
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: url,
   headers: {
     "Content-Type": "application/json",
   },
