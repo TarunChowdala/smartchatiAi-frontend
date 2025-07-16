@@ -3,11 +3,11 @@
 
 @media all and (max-width: 480px) {
   .chatbot-main-container {
-    padding: 10px !important;
+    padding: 0px !important;
   }
   .card-container {
     border: none !important;
-    max-height: calc(100vh - 115px) !important;
+    max-height: calc(100dvh - -6px) !important;
   }
   .card-inner-container {
     padding: 12px !important;
@@ -16,9 +16,9 @@
     gap: 4px !important;
     flex-direction: column !important;
   }
-  /* .input-element-container {
-    padding: 4px 6px !important;
-  } */
+  .input-element-container {
+    padding: 4px 8px !important;
+  }
   .message-item-bot {
     min-width: 95vw !important;
   }

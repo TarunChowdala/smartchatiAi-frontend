@@ -5,7 +5,7 @@
   }
   .document-chat-card-inner-container {
     padding: 4px !important;
-    max-height: calc(100vh - 234px) !important;
+    max-height: calc(100dvh - 234px) !important;
   }
   .document-upload-card-inner-container {
     border: none !important;
