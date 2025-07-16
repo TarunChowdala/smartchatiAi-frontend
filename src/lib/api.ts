@@ -14,7 +14,7 @@ const url =
     : "https://smartchatai-fastapi.onrender.com/";
 
 const api = axios.create({
-  baseURL: url,
+  baseURL: "https://smartchatai-fastapi.onrender.com/",
   headers: {
     "Content-Type": "application/json",
   },

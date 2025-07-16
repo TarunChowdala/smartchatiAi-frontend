@@ -10,15 +10,15 @@
     max-height: calc(100vh - 115px) !important;
   }
   .card-inner-container {
-    padding: 4px !important;
+    padding: 12px !important;
   }
   .message-item {
     gap: 4px !important;
     flex-direction: column !important;
   }
-  .input-element-container {
+  /* .input-element-container {
     padding: 4px 6px !important;
-  }
+  } */
   .message-item-bot {
     min-width: 95vw !important;
   }
