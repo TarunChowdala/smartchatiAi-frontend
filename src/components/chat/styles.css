@@ -3,11 +3,11 @@
 
 @media all and (max-width: 480px) {
   .chatbot-main-container {
-    padding: 0px !important;
+    padding: 8px !important;
   }
   .card-container {
     border: none !important;
-    max-height: calc(100vh - -5px) !important;
+    max-height: calc(100vh - 116px) !important;
   }
   .card-inner-container {
     padding: 4px !important;
