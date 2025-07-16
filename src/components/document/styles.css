@@ -9,5 +9,6 @@
   }
   .document-upload-card-inner-container {
     border: none !important;
+    padding: 12px !important;
   }
 }
