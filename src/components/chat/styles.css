@@ -7,7 +7,7 @@
   }
   .card-container {
     border: none !important;
-    max-height: calc(100dvh - -6px) !important;
+    max-height: calc(100dvh - 150px) !important;
   }
   .card-inner-container {
     padding: 12px !important;
