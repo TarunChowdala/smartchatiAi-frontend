@@ -13,6 +13,7 @@ import SignupPage from "./pages/Signup";
 import ProtectedRoute from "./pages/ProtectedRoute";
 import { ProfileProvider } from "./components/ProfileContext";
 import { CurrentSessionProvider } from "./components/CurrentSession";
+import NotFound from "./pages/Notfound";
 
 function App() {
   return (
@@ -56,6 +57,7 @@ function App() {
               />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Router>
         </ThemeProvider>
