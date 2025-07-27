@@ -31,6 +31,8 @@ export default function DocumentChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingDocument, setUploadingDocument] = useState(false);
 
+  const [currentDocumentId, setCurrentDocumentId] = useState<any>(null);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -38,6 +40,60 @@ export default function DocumentChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const getCurrentDucomentStatus = async () => {
+    if (!currentDocumentId) {
+      setError("No document ID found.");
+      return;
+    }
+    try {
+      const response = await api.get("/document/status", {
+        params: { task_id: currentDocumentId },
+      });
+      if (response.data.processing === false) {
+        setUploadingDocument(false);
+        setIsLoading(false);
+        toast.success("File uploaded successfully.", {
+          duration: 2000,
+          position: "top-right",
+          style: {
+            background: "#333",
+            color: "#fff",
+          },
+        });
+        // console.log(response, "response");
+        const aiMessage: Message = {
+          id: Date.now().toString(),
+          content: `I've analyzed your document". What would you like to know about this document?`,
+          role: "assistant",
+        };
+        setMessages([aiMessage]);
+      }
+      return response.data;
+    } catch (err: any) {
+      if (err.response && err.response.status === 404) {
+        setError("Invalid document ID.");
+      } else {
+        setError("Failed to fetch document status.");
+      }
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    if (!currentDocumentId) return;
+    const interval = setInterval(async () => {
+      const status = await getCurrentDucomentStatus();
+      if (status && status.processing === false) {
+        clearInterval(interval);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      setCurrentDocumentId(null);
+    };
+  }, [currentDocumentId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -79,24 +135,8 @@ export default function DocumentChatPage() {
         },
       });
 
-      setUploadingDocument(false);
-
       if (response.status === 200) {
-        toast.success("File uploaded successfully.", {
-          duration: 2000,
-          position: "top-right",
-          style: {
-            background: "#333",
-            color: "#fff",
-          },
-        });
-
-        const aiMessage: Message = {
-          id: Date.now().toString(),
-          content: `I've analyzed "${file.name}". What would you like to know about this document?`,
-          role: "assistant",
-        };
-        setMessages([aiMessage]);
+        setCurrentDocumentId(response?.data?.task_id);
       }
     } catch (err: any) {
       console.error("Error:", err);
@@ -131,8 +171,6 @@ export default function DocumentChatPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -154,6 +192,7 @@ export default function DocumentChatPage() {
     try {
       const response = await api.post("/document/ask", {
         question: input,
+        task_id: currentDocumentId,
       });
 
       const aiMessage: Message = {
@@ -213,10 +252,13 @@ export default function DocumentChatPage() {
     setUploadedFile(null);
     setMessages([]);
     setActiveTab("upload");
+    setCurrentDocumentId(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
+
+  console.log(uploadingDocument, "uploadingDocument");
 
   return (
     <div
