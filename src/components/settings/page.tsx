@@ -564,7 +564,7 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </motion.div>
-      <Toaster />
+      <Toaster position="top-right" />
     </div>
   );
 }
