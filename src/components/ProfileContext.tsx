@@ -1,12 +1,11 @@
 import React, {
   createContext,
   useContext,
-  useState,
   ReactNode,
   useEffect,
 } from "react";
-
-import api from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { useGetMe } from "@/hooks/auth/useAuth";
 
 interface Profile {
   id: string;
@@ -35,36 +34,31 @@ interface ProfileProviderProps {
 export const ProfileProvider: React.FC<ProfileProviderProps> = ({
   children,
 }) => {
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const token = localStorage.getItem("token");
+  const { data: userData, isLoading, refetch: fetchUserDetails } = useGetMe();
 
-  const fetchUserDetails = async () => {
-    try {
-      setIsLoading(true);
-      const response = await api.get("/auth/me");
-
-      if (response.data) {
-        let data = response.data;
-        data.id = data.uid;
-        delete data.uid;
-        setProfile(response.data);
+  // Transform user data to match Profile interface
+  const profile = userData
+    ? {
+        ...userData,
+        id: userData.id || userData.uid,
+        profileImage: userData.profileImage || "",
       }
-    } catch (error: any) {
-      console.error("Error fetching user details:", error);
-      setProfile(null);
-    } finally {
-      setIsLoading(false);
+    : null;
+
+  const setProfile = (newProfile: Profile | null) => {
+    if (newProfile) {
+      queryClient.setQueryData(["auth", "me"], newProfile);
+    } else {
+      queryClient.setQueryData(["auth", "me"], null);
     }
   };
 
   const logout = () => {
-    setProfile(null);
+    queryClient.setQueryData(["auth", "me"], null);
+    queryClient.clear();
   };
-
-  useEffect(() => {
-    token && fetchUserDetails();
-  }, [token]);
 
   const value = {
     profile,
@@ -72,7 +66,9 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
     isAuthenticated: !!profile,
     logout,
     isLoading,
-    fetchUserDetails,
+    fetchUserDetails: async () => {
+      await fetchUserDetails();
+    },
   };
 
   return (

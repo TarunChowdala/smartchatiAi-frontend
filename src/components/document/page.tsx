@@ -2,17 +2,16 @@ import type React from "react";
 import "./styles.css";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, User, Bot, Loader2, Upload, File, X } from "lucide-react";
+import { Send, User, Bot, Loader2, Upload, File, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
-import axios from "axios";
-import api from "@/lib/api";
 import MessageContent from "../chat/MessageContent";
 import toast, { Toaster } from "react-hot-toast";
+import { useUploadDocument, useDocumentStatus, useAskDocument, useDeleteDocument } from "@/hooks/document/useDocument";
 
 type Message = {
   id: string;
@@ -31,7 +30,13 @@ export default function DocumentChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingDocument, setUploadingDocument] = useState(false);
 
-  const [currentDocumentId, setCurrentDocumentId] = useState<any>(null);
+  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null);
+
+  // React Query hooks
+  const uploadDocumentMutation = useUploadDocument();
+  const { data: documentStatus } = useDocumentStatus(currentDocumentId, !!currentDocumentId && uploadingDocument);
+  const askDocumentMutation = useAskDocument();
+  const deleteDocumentMutation = useDeleteDocument();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -41,59 +46,19 @@ export default function DocumentChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  const getCurrentDucomentStatus = async () => {
-    if (!currentDocumentId) {
-      setError("No document ID found.");
-      return;
-    }
-    try {
-      const response = await api.get("/document/status", {
-        params: { task_id: currentDocumentId },
-      });
-      if (response.data.processing === false) {
-        setUploadingDocument(false);
-        setIsLoading(false);
-        toast.success("File uploaded successfully.", {
-          duration: 2000,
-          position: "top-right",
-          style: {
-            background: "#333",
-            color: "#fff",
-          },
-        });
-        // console.log(response, "response");
-        const aiMessage: Message = {
-          id: Date.now().toString(),
-          content: `I've analyzed your document". What would you like to know about this document?`,
-          role: "assistant",
-        };
-        setMessages([aiMessage]);
-      }
-      return response.data;
-    } catch (err: any) {
-      if (err.response && err.response.status === 404) {
-        setError("Invalid document ID.");
-      } else {
-        setError("Failed to fetch document status.");
-      }
-      return null;
-    }
-  };
-
+  // Handle document status updates
   useEffect(() => {
-    if (!currentDocumentId) return;
-    const interval = setInterval(async () => {
-      const status = await getCurrentDucomentStatus();
-      if (status && status.processing === false) {
-        clearInterval(interval);
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-      setCurrentDocumentId(null);
-    };
-  }, [currentDocumentId]);
+    if (documentStatus?.ready) {
+      const aiMessage: Message = {
+        id: Date.now().toString(),
+        content: `I've analyzed your document. What would you like to know about this document?`,
+        role: "assistant",
+      };
+      setMessages([aiMessage]);
+      setUploadingDocument(false);
+      setIsLoading(false);
+    }
+  }, [documentStatus]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -128,15 +93,10 @@ export default function DocumentChatPage() {
         }
         return;
       }
-      const response = await api.post("/document/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          withCredentials: true,
-        },
-      });
+      const response = await uploadDocumentMutation.mutateAsync(file);
 
-      if (response.status === 200) {
-        setCurrentDocumentId(response?.data?.task_id);
+      if (response.document_id) {
+        setCurrentDocumentId(response.document_id);
       }
     } catch (err: any) {
       console.error("Error:", err);
@@ -190,14 +150,14 @@ export default function DocumentChatPage() {
     setError("");
 
     try {
-      const response = await api.post("/document/ask", {
+      const response = await askDocumentMutation.mutateAsync({
+        document_id: currentDocumentId!,
         question: input,
-        task_id: currentDocumentId,
       });
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response.data.answer,
+        content: response.answer,
         role: "assistant",
       };
       setMessages((prev) => [...prev, aiMessage]);
@@ -258,7 +218,33 @@ export default function DocumentChatPage() {
     }
   };
 
-  console.log(uploadingDocument, "uploadingDocument");
+  const handleDeleteDocument = async () => {
+    if (!currentDocumentId) return;
+
+    if (!confirm("Are you sure you want to delete this document? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await deleteDocumentMutation.mutateAsync(currentDocumentId);
+      toast.success("Document deleted successfully", {
+        duration: 2000,
+        position: "top-right",
+      });
+      removeFile();
+    } catch (error: any) {
+      console.error("Error deleting document:", error);
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        "Failed to delete document";
+      toast.error(errorMessage, {
+        duration: 2000,
+        position: "top-right",
+      });
+    }
+  };
+
 
   return (
     <div
@@ -347,14 +333,27 @@ export default function DocumentChatPage() {
                   ({Math.round(uploadedFile.size / 1024)} KB)
                 </span>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={removeFile}
-                className="h-8 w-8"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDeleteDocument}
+                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  disabled={deleteDocumentMutation.isPending}
+                  title="Delete document"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={removeFile}
+                  className="h-8 w-8"
+                  title="Remove from view"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <CardContent
               className={`flex-1 overflow-y-auto p-4 space-y-4 ${

@@ -34,6 +34,7 @@ import {
 import { useProfile } from "../ProfileContext";
 import api from "@/lib/api";
 import toast, { Toaster } from "react-hot-toast";
+import { useUpdateMe, useUpdatePassword } from "@/hooks/auth/useAuth";
 
 export default function SettingsPage() {
   const { profile, fetchUserDetails } = useProfile();
@@ -58,6 +59,8 @@ export default function SettingsPage() {
     about: profile?.about || "",
   });
 
+  const updateUserMutation = useUpdateMe();
+  const updatePasswordMutation = useUpdatePassword();
   const [updatingDetails, setUpdatingDetails] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
 
@@ -107,18 +110,15 @@ export default function SettingsPage() {
 
     try {
       setUpdatingDetails(true);
-      const response = await api.post("/auth/update-me", body);
-      if (response.data) {
-        toast.success("Profile updated successfully");
-        if (updatePassword) {
-          setPasswords({
-            currentPassword: "",
-            newPassword: "",
-            confirmPassword: "",
-          });
-          setUpdatePassword(false);
-        }
-        fetchUserDetails();
+      const response = await updateUserMutation.mutateAsync(body);
+      toast.success("Profile updated successfully");
+      if (updatePassword) {
+        setPasswords({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+        setUpdatePassword(false);
       }
       setUpdatingDetails(false);
     } catch (error) {
@@ -145,31 +145,18 @@ export default function SettingsPage() {
 
     try {
       setResettingPassword(true);
-      const response = await api.post("/auth/update-password", {
-        email: userData.email,
-        current_password: passwords.currentPassword,
-        new_password: passwords.newPassword,
+      await updatePasswordMutation.mutateAsync({
+        currentPassword: passwords.currentPassword,
+        newPassword: passwords.newPassword,
       });
 
-      if (response.data) {
-        // Update both tokens in localStorage
-        if (response.data.idToken) {
-          localStorage.setItem("token", response.data.idToken);
-        }
-        if (response.data.refreshToken) {
-          localStorage.setItem("refreshToken", response.data.refreshToken);
-        }
-
-        // Clear password fields
-        setPasswords({
-          currentPassword: "",
-          newPassword: "",
-          confirmPassword: "",
-        });
-
-        toast.success("Password updated successfully");
-      }
-      setResettingPassword(false);
+      toast.success("Password updated successfully");
+      setPasswords({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setUpdatePassword(false);
     } catch (error: any) {
       console.error("Error updating password:", error);
       if (error.response?.status === 401) {

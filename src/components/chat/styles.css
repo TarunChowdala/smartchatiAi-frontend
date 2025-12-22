@@ -1,3 +1,27 @@
+/* Enhanced hover effects with arctic blue theme */
+.message-item {
+  transition: all 0.2s ease;
+}
+
+.message-item:hover {
+  opacity: 0.95;
+}
+
+.card-container {
+  transition: border-color 0.2s ease;
+}
+
+/* Subtle blue glow on focus */
+input:focus,
+textarea:focus {
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+}
+
+/* Smooth transitions for theme switching */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
 @media all and (max-width: 767px) {
 }
 

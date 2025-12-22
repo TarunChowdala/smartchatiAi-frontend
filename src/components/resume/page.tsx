@@ -23,9 +23,9 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import toast, { Toaster } from "react-hot-toast";
-import api from "@/lib/api";
 import html2pdf from "html2pdf.js";
 import "./styles.css";
+import { useCompareResumeJD } from "@/hooks/resume/useResume";
 
 type AnalysisResult = {
   score: number;
@@ -632,6 +632,9 @@ export default function ResumePage() {
   const [generatingResume, setGeneratingResume] = useState(false);
   const [showResumeView, setShowResumeView] = useState(false); // Track if we're in resume-only view
 
+  // React Query hook
+  const compareResumeMutation = useCompareResumeJD();
+
   const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type === "application/pdf") {
@@ -660,32 +663,26 @@ export default function ResumePage() {
     setIsAnalyzing(true);
 
     try {
-      const formData = new FormData();
-      formData.append("file", uploadedResume);
-      formData.append("job_description", JSON.stringify(jobDescription));
-
-      const response = await api.post("/resume/compare-resume-jd", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        timeout: 120000, // 2 minutes timeout
+      const response = await compareResumeMutation.mutateAsync({
+        file: uploadedResume,
+        jobDescription,
       });
 
       // Validate response structure
-      if (!response?.data) {
+      if (!response) {
         throw new Error("Invalid response from server");
       }
 
-      const analysisData = response.data.analysis;
+      const analysisData = response.analysis;
       if (!analysisData) {
         throw new Error("Analysis data not found in response");
       }
 
-      if (response.data.resume_text) {
-        localStorage.setItem("resume_text", response.data.resume_text);
+      if (response.resume_text) {
+        localStorage.setItem("resume_text", response.resume_text);
       }
-      if (response.data.job_description) {
-        localStorage.setItem("jd", response.data.job_description);
+      if (response.job_description) {
+        localStorage.setItem("jd", response.job_description);
       }
 
       // Parse analysis data safely

@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Brain, Eye, EyeOff, Loader2 } from "lucide-react";
-import api from "@/lib/api";
 import toast, { Toaster } from "react-hot-toast";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useProfile } from "@/components/ProfileContext";
+import { useSignup, useGoogleSignup } from "@/hooks/auth/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -33,12 +34,15 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const navigate = useNavigate();
   const { setProfile } = useProfile();
+  const signupMutation = useSignup();
+  const googleSignupMutation = useGoogleSignup();
+  const queryClient = useQueryClient();
+  const isLoading = signupMutation.isPending || googleSignupMutation.isPending;
 
   const debouncedConfirmPassword = useDebounce(confirmPassword, 500);
 
@@ -71,7 +75,7 @@ export default function SignupPage() {
 
       // calling signup api to store user in users table
       try {
-        const response = await api.post("/auth/signup", {
+        await signupMutation.mutateAsync({
           email,
           password,
           name,
@@ -171,7 +175,6 @@ export default function SignupPage() {
           setTimeout(() => {
             navigate("/dashboard");
           }, 1000);
-          getProfileDetails();
         } catch {
           await user.delete();
           toast.error("Account creation failed. Please try again.", {
@@ -179,17 +182,16 @@ export default function SignupPage() {
           });
           return;
         }
-      }
-      if (!isNewUser) {
-        toast.success("Successfully signed up with Google.", {
+      } else {
+        toast.success("Successfully signed in with Google.", {
           duration: 2000,
         });
         localStorage.setItem("token", idToken);
         localStorage.setItem("refreshToken", refreshToken);
+        await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
         setTimeout(() => {
           navigate("/dashboard");
         }, 2000);
-        getProfileDetails;
       }
     } catch (error: any) {
       toast.error("Google sign-in failed. Please try again.", {
@@ -199,16 +201,6 @@ export default function SignupPage() {
     }
   };
 
-  const getProfileDetails = async () => {
-    try {
-      const response = await api.get("/auth/me");
-      if (response?.data) {
-        setProfile(response.data);
-      }
-    } catch (err) {
-      console.log(err, "err");
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

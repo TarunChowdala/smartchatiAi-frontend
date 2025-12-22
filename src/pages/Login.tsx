@@ -5,18 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Brain, Eye, EyeOff, Loader2 } from "lucide-react";
-import api from "@/lib/api";
 import toast, { Toaster } from "react-hot-toast";
 import { useProfile } from "@/components/ProfileContext";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { useLogin, useGoogleSignup } from "@/hooks/auth/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function LoginPage() {
   const { setProfile } = useProfile();
   const [userData, setUserData] = useState({ email: "", password: "" });
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const loginMutation = useLogin();
+  const googleSignupMutation = useGoogleSignup();
+  const isLoading = loginMutation.isPending || googleSignupMutation.isPending;
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -27,42 +31,29 @@ export default function LoginPage() {
     }
   });
 
-  const getProfileDetails = async () => {
-    try {
-      const response = await api.get("/auth/me");
-      if (response?.data) {
-        setProfile(response.data);
-      }
-    } catch (err) {
-      console.log(err, "err");
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     try {
-      const response = await api.post("/auth/login", {
+      const response = await loginMutation.mutateAsync({
         email: userData.email,
         password: userData.password,
       });
-      if (response?.data) {
-        // Store the tokens in localStorage
-        const token = response.data.idToken;
-        localStorage.setItem("token", response.data.idToken);
-        localStorage.setItem("refreshToken", response.data.refreshToken);
 
-        // Show success message
-        toast.success("Login successful!", {
-          duration: 2000,
-        });
-        setTimeout(() => {
-          navigate("/dashboard");
-        }, 2000);
-        if (token) {
-          getProfileDetails();
-        }
-      }
+      // Store the tokens in localStorage
+      localStorage.setItem("token", response.idToken);
+      localStorage.setItem("refreshToken", response.refreshToken);
+
+      // Show success message
+      toast.success("Login successful!", {
+        duration: 2000,
+      });
+
+      // Refetch user profile
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 2000);
     } catch (error: any) {
       console.log(error, "error===");
       if (error.response?.status === 400) {
@@ -74,22 +65,13 @@ export default function LoginPage() {
           duration: 2000,
         });
       } else {
-        if (error?.response && error?.response?.data.detail) {
-          toast.error(
-            error?.response?.data?.detail ||
-              "erAn unexpected error occurred. Please try again.",
-            {
-              duration: 2000,
-            }
-          );
-          return;
-        }
-        toast.error("erAn unexpected error occurredong. Please try again.", {
+        const errorMessage =
+          error?.response?.data?.detail ||
+          "An unexpected error occurred. Please try again.";
+        toast.error(errorMessage, {
           duration: 2000,
         });
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -99,30 +81,27 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       const idToken = await user.getIdToken();
-      const uid = user.uid;
-      const name = user.displayName;
-      const email = user.email;
-      const profileImage = user.photoURL;
+      const name = user.displayName || "";
+      const email = user.email || "";
       const isNewUser = (result as any)?._tokenResponse?.isNewUser ?? false;
       const refreshToken = (result as any)?._tokenResponse?.refreshToken;
+
       if (isNewUser) {
         try {
-          await api.post("/auth/google-signup", {
+          await googleSignupMutation.mutateAsync({
+            idToken,
             email,
             name,
-            uid,
-            idToken,
-            profileImage,
           });
           toast.success("Successfully signed up with Google.", {
             duration: 2000,
           });
           localStorage.setItem("token", idToken);
           localStorage.setItem("refreshToken", refreshToken);
+          await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
           setTimeout(() => {
             navigate("/dashboard");
           }, 2000);
-          getProfileDetails();
         } catch {
           await user.delete();
           toast.error("Account creation failed. Please try again.", {
@@ -130,24 +109,22 @@ export default function LoginPage() {
           });
           return;
         }
-      }
-      if (!isNewUser) {
-        toast.success("Successfully signed up with Google.", {
+      } else {
+        toast.success("Successfully signed in with Google.", {
           duration: 2000,
         });
         localStorage.setItem("token", idToken);
         localStorage.setItem("refreshToken", refreshToken);
+        await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
         setTimeout(() => {
           navigate("/dashboard");
         }, 2000);
-        getProfileDetails();
       }
     } catch (error: any) {
       toast.error("Google sign-in failed. Please try again.", {
         duration: 2000,
       });
       console.error(error);
-    } finally {
     }
   };
 

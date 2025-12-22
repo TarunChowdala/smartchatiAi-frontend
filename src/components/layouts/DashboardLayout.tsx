@@ -152,10 +152,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <Link
                     key={item.name}
                     to={item.path}
-                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${
+                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                       location.pathname === item.path
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-accent hover:text-accent-foreground"
+                        ? "bg-muted border border-primary text-foreground"
+                        : "hover:bg-muted hover:text-accent-foreground"
                     }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >

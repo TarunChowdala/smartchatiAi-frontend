@@ -19,11 +19,26 @@ import {
   Check,
   ChevronDown,
   // Layers,
+  MessageSquare,
+  Plus,
+  Menu,
+  X,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 // import {
 //   DropdownMenu,
 //   DropdownMenuContent,
@@ -31,7 +46,6 @@ import { Card, CardContent } from "@/components/ui/card";
 //   DropdownMenuTrigger,
 // } from "@radix-ui/react-dropdown-menu";
 // import { CardHeader } from "../ui/card";
-import api from "@/lib/api";
 import MessageContent from "./MessageContent";
 // import {
 //   Select,
@@ -42,6 +56,10 @@ import MessageContent from "./MessageContent";
 // } from "@radix-ui/react-select";
 import toast, { Toaster } from "react-hot-toast";
 import { useProfile } from "../ProfileContext";
+import { useChatSessions } from "@/hooks/chat/useChatSessions";
+import { useSendMessage } from "@/hooks/chat/useSendMessage";
+import { useSessionMessages } from "@/hooks/chat/useSessionMessages";
+import { useDeleteSession } from "@/hooks/chat/useDeleteSession";
 
 import {
   collection,
@@ -50,6 +68,9 @@ import {
   serverTimestamp,
   addDoc,
   updateDoc,
+  getDocs,
+  query,
+  orderBy,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../../lib/firebase";
@@ -62,6 +83,8 @@ interface ModelOption {
   description: string;
   category: "openai" | "undi95" | "mistral" | "gryphe" | "google" | "deepseek";
 }
+
+import type { Session } from "@/services/chat/chatService";
 
 const modelsList: ModelOption[] = [
   {
@@ -117,6 +140,16 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+
+  // React Query hooks
+  const { data: sessionsData, isLoading: isLoadingSessions } = useChatSessions(50);
+  const sessions = sessionsData?.sessions || [];
+  const sendMessageMutation = useSendMessage();
+  const deleteSessionMutation = useDeleteSession();
+  const { data: sessionMessagesData } = useSessionMessages(currentSessionId);
 
   // const [chatHistory, setChatHistory] = useState([
   //   {
@@ -149,6 +182,70 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load messages from API when session changes
+  useEffect(() => {
+    if (sessionMessagesData?.messages) {
+      const loadedMessages: Message[] = sessionMessagesData.messages.map((msg) => ({
+        id: msg.id,
+        content: msg.content,
+        sender: msg.sender === "user" ? "user" : "assistant",
+      }));
+      setMessages(loadedMessages);
+      setIsChatStarted(loadedMessages.length > 0);
+    } else if (currentSessionId && !sessionMessagesData) {
+      // Clear messages if session exists but no data yet (loading state)
+      setMessages([]);
+      setIsChatStarted(false);
+    }
+  }, [sessionMessagesData, currentSessionId]);
+
+  const handleSessionClick = (session: Session) => {
+    setCurrentSessionId(session.session_id);
+    // Close sidebar on mobile after selection
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation(); // Prevent session click
+    setSessionToDelete(sessionId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!sessionToDelete) return;
+
+    try {
+      console.log("Deleting session:", sessionToDelete);
+      await deleteSessionMutation.mutateAsync(sessionToDelete);
+      toast.success("Session deleted successfully", { duration: 2000 });
+      
+      // If deleted session was current, clear it
+      if (currentSessionId === sessionToDelete) {
+        setCurrentSessionId("");
+        setMessages([]);
+        setIsChatStarted(false);
+      }
+      
+      // setDeleteDialogOpen(false);
+      setSessionToDelete(null);
+    } catch (error: any) {
+      console.error("Error deleting session:", error);
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        "Failed to delete session";
+      toast.error(errorMessage, { duration: 2000 });
+    }
+  };
+
+  const handleNewChat = () => {
+    setCurrentSessionId("");
+    setMessages([]);
+    setIsChatStarted(false);
+  };
 
   // Initialize and select the best voice
   // useEffect(() => {
@@ -226,6 +323,15 @@ export default function ChatPage() {
       return;
     }
 
+    // Create new session if one doesn't exist
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      const sessionName = generateSessionName(input);
+      sessionId = await startNewSession(sessionName, input);
+      setCurrentSessionId(sessionId);
+      setIsChatStarted(true);
+    }
+
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -239,7 +345,7 @@ export default function ChatPage() {
     const messagesRef = collection(
       db,
       "sessions",
-      currentSessionId,
+      sessionId,
       "messages"
     );
     await addDoc(messagesRef, {
@@ -251,48 +357,46 @@ export default function ChatPage() {
     });
 
     //Updating the current session with latest info
-    const sessionRef = doc(db, "sessions", currentSessionId);
+    const sessionRef = doc(db, "sessions", sessionId);
+    const messageInput = input; // Save input before clearing
     await updateDoc(sessionRef, {
-      last_message: input,
+      last_message: messageInput,
       updated_at: serverTimestamp(),
     });
 
     setInput("");
 
     try {
-      const response = await api.post("/chat/send-message", {
+      const response = await sendMessageMutation.mutateAsync({
         user_id: profile.id,
-        message: input,
+        message: messageInput,
         model_name: selectedModel,
-        session_id: currentSessionId,
+        session_id: sessionId,
       });
-      // console.log(response, "response");
-      if (response.status === 200) {
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content:
-            response?.data?.reply || "Sorry, I couldn't process your request.",
-          sender: "assistant",
-        };
-        setGotResponse(true);
-        setTimeout(() => {
-          setGotResponse(false);
-        }, 1000);
-        setMessages((prev) => [...prev, aiMessage]);
 
-        await addDoc(messagesRef, {
-          id: uuidv4(),
-          content: response?.data?.reply,
-          sender: "assistant",
-          timestamp: serverTimestamp(),
-          type: "text",
-        });
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: response?.reply || "Sorry, I couldn't process your request.",
+        sender: "assistant",
+      };
+      setGotResponse(true);
+      setTimeout(() => {
+        setGotResponse(false);
+      }, 1000);
+      setMessages((prev) => [...prev, aiMessage]);
 
-        await updateDoc(sessionRef, {
-          last_message: response?.data?.reply,
-          updated_at: serverTimestamp(),
-        });
-      }
+      await addDoc(messagesRef, {
+        id: uuidv4(),
+        content: response?.reply,
+        sender: "assistant",
+        timestamp: serverTimestamp(),
+        type: "text",
+      });
+
+      await updateDoc(sessionRef, {
+        last_message: response?.reply,
+        updated_at: serverTimestamp(),
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "An error occurred";
@@ -311,99 +415,6 @@ export default function ChatPage() {
     }
   };
 
-  const handleStartChat = async (session_name: any, firstMessage: any) => {
-    try {
-      const sessionId = await startNewSession(session_name, input);
-      setCurrentSessionId(sessionId);
-      setIsChatStarted(true);
-
-      // setTimeout(() => {
-      //   if (formRef.current) {
-      //     formRef.current.requestSubmit();
-      //   }
-      // }, 100);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to start chat session", {
-        duration: 2000,
-      });
-    }
-  };
-
-  if (!isChatStarted) {
-    const suggestedPrompts = [
-      {
-        id: 1,
-        text: "What can you help me with?",
-        label: "General Help",
-        icon: "💡",
-        description: "Let me show you what I can do",
-      },
-      {
-        id: 2,
-        text: "Can you help me write some code?",
-        label: "Code Assistance",
-        icon: "👨‍💻",
-        description: "I'll help you with your coding tasks",
-      },
-      {
-        id: 3,
-        text: "Can you explain something to me?",
-        label: "Explanation",
-        icon: "📚",
-        description: "I'll break it down in simple terms",
-      },
-    ];
-
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4"
-      >
-        <div className="text-center max-w-xl w-full">
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="mb-6"
-          >
-            <h1 className="text-xl md:text-2xl font-bold mb-2">
-              Hey {profile?.name?.split(" ")[0] || "there"}! 👋
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              I'm here to help! What would you like to chat about?
-            </p>
-          </motion.div>
-
-          <div className="grid gap-3 w-full">
-            {suggestedPrompts.map((prompt, index) => (
-              <motion.button
-                key={prompt.id}
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.3 + index * 0.1 }}
-                onClick={() => {
-                  setInput(prompt.text);
-                  handleStartChat(prompt.label, prompt.text);
-                }}
-                className="group flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-muted/50 transition-all duration-200 w-full text-left"
-              >
-                <span className="text-base">{prompt.icon}</span>
-                <div>
-                  <h3 className="text-sm font-medium group-hover:text-primary transition-colors">
-                    {prompt.text}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {prompt.description}
-                  </p>
-                </div>
-              </motion.button>
-            ))}
-          </div>
-        </div>
-      </motion.div>
-    );
-  }
 
   function getTypingIndicator(messageId: string) {
     if (!isLoading) return false;
@@ -415,34 +426,165 @@ export default function ChatPage() {
     );
   }
 
+  const formatDate = (timestamp: string) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getSessionTitle = (session: Session) => {
+    if (session.session_name) {
+      return session.session_name;
+    }
+    if (session.message_count === 0) return "New Chat";
+    const date = new Date(session.created_at);
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `Chat from ${dateStr}`;
+  };
+
+  const generateSessionName = (message: string): string => {
+    // Truncate message to 50 characters for session name
+    const maxLength = 50;
+    const trimmed = message.trim();
+    if (trimmed.length <= maxLength) {
+      return trimmed;
+    }
+    return trimmed.substring(0, maxLength).trim() + "...";
+  };
+
   return (
-    <div className="w-full px-8 md:px-16 lg:px-24 flex flex-col chatbot-main-container">
+    <div className="flex h-[calc(100vh-4rem)] w-full">
       <Toaster position="top-right" />
+      
+      {/* Sidebar */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="mb-4"
+        initial={{ width: sidebarOpen ? 300 : 0 }}
+        animate={{ width: sidebarOpen ? 300 : 0 }}
+        className={`border-r border-border bg-background overflow-hidden flex flex-col ${
+          sidebarOpen ? "" : "hidden md:flex"
+        }`}
       >
-        {/* {window.innerWidth > 480 && (
-          <>
-            <h1 className="text-2xl font-bold">AI Chat</h1>
-            <p className="text-muted-foreground">
-              Chat with our AI assistant about anything.
-            </p>
-          </>
-        )} */}
+        <div className="p-4 border-b border-border">
+          <Button
+            onClick={handleNewChat}
+            className="w-full justify-start gap-2"
+            variant="outline"
+          >
+            <Plus className="h-4 w-4" />
+            New Chat
+          </Button>
+        </div>
+        
+        <div
+          className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-muted scrollbar-track-transparent"
+          style={{ scrollbarWidth: "thin" }}
+        >
+          {isLoadingSessions ? (
+            <div className="flex items-center justify-center p-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="text-center text-muted-foreground text-sm p-4">
+              No chat history yet
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {sessions.map((session) => (
+                <div
+                  key={session.session_id}
+                  className={`group relative w-full text-left p-3 rounded-lg transition-colors hover:bg-muted ${
+                    currentSessionId === session.session_id
+                      ? "bg-muted border border-primary"
+                      : ""
+                  }`}
+                >
+                  <button
+                    onClick={() => handleSessionClick(session)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-start gap-2">
+                      <MessageSquare className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {getSessionTitle(session)}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(session.updated_at)}
+                          </p>
+                          {session.message_count > 0 && (
+                            <>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                {session.message_count} message{session.message_count !== 1 ? 's' : ''}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => handleDeleteClick(e, session.session_id)}
+                    className="absolute right-2 top-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                    disabled={deleteSessionMutation.isPending}
+                    title="Delete session"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </motion.div>
-      <Card
-        className="flex-1 overflow-hidden flex flex-col card-container border-none"
-        style={{ maxHeight: "calc(100vh - 5rem)" }}
-      >
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col chatbot-main-container relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="absolute top-4 left-4 z-10 md:hidden"
+        >
+          {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </Button>
+        <Card
+          className="flex-1 overflow-hidden flex flex-col card-container border-none h-full"
+        >
         <CardContent
           ref={chatContainerRef}
-          className="card-inner-container flex-1 p-4 overflow-y-auto space-y-4"
+          className="card-inner-container flex-1 p-4 overflow-y-auto space-y-4 flex flex-col"
           style={{ scrollbarWidth: "none" }}
         >
-          <AnimatePresence>
-            {messages.map((message) => (
+          {messages.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">
+                  Welcome{profile?.name ? `, ${profile.name}` : ""}! 👋
+                </h3>
+                <p className="text-sm text-muted-foreground mb-1">
+                  I&apos;m here to help with your questions, ideas, and projects.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Select a session from the sidebar or just start typing to begin a new chat.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <AnimatePresence>
+              {messages.map((message) => (
               <motion.div
                 key={message.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -543,7 +685,8 @@ export default function ChatPage() {
                 </div>
               </motion.div>
             )}
-          </AnimatePresence>
+            </AnimatePresence>
+          )}
           <div ref={messagesEndRef} />
         </CardContent>
         <div
@@ -735,6 +878,51 @@ export default function ChatPage() {
           </form>
         </div>
       </Card>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog 
+        open={deleteDialogOpen} 
+        onOpenChange={(open: boolean) => {
+          // Prevent closing during API call
+          if (!open && deleteSessionMutation.isPending) {
+            return;
+          }
+          setDeleteDialogOpen(open);
+          if (!open) {
+            setSessionToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Session</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this session? This action cannot be undone and all messages in this session will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                if (!deleteSessionMutation.isPending) {
+                  setDeleteDialogOpen(false);
+                  setSessionToDelete(null);
+                }
+              }}
+              disabled={deleteSessionMutation.isPending}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteSessionMutation.isPending}
+            >
+              {deleteSessionMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
