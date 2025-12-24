@@ -12,6 +12,7 @@ import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useProfile } from "@/components/ProfileContext";
 import { useSignup, useGoogleSignup } from "@/hooks/auth/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -60,8 +61,6 @@ export default function SignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    setIsLoading(true);
 
     try {
       const userCredential = await createUserWithEmailAndPassword(
@@ -141,8 +140,6 @@ export default function SignupPage() {
           duration: 2000,
         });
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 

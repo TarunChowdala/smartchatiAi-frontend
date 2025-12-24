@@ -13,7 +13,7 @@ interface Profile {
   email: string;
   profileImage: string;
   about?: string;
-  password: string;
+  password?: string;
 }
 
 interface ProfileContextType {

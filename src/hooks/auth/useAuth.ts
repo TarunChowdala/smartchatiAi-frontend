@@ -24,6 +24,7 @@ export const useGetMe = () => {
     queryKey: ["auth", "me"],
     queryFn: () => authService.getMe(),
     enabled: !!localStorage.getItem("token"),
+    refetchInterval: 1000 * 60 * 5, // 5 minutes
   });
 };
 

@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import toast, { Toaster } from "react-hot-toast";
 import html2pdf from "html2pdf.js";
 import "./styles.css";
-import { useCompareResumeJD } from "@/hooks/resume/useResume";
+import { useCompareResumeJD, useGenerateResume } from "@/hooks/resume/useResume";
 
 type AnalysisResult = {
   score: number;
@@ -38,7 +38,7 @@ type AnalysisResult = {
   recommendedKeywords: string[];
 };
 
-// Resume JSON Data Types
+// Resume JSON Data Types - Old Format (for backward compatibility)
 type ResumeContact = {
   phone: string;
   email: string;
@@ -76,12 +76,241 @@ type ResumeSkills = {
 
 type ResumeData = {
   name: string;
+  title?: string;
   contact: ResumeContact;
   summary: string;
+  summaryHeadline?: string;
+  summaryHighlights?: string[];
   experience: ResumeExperience[];
   projects: ResumeProject[];
   education: ResumeEducation[];
   skills: ResumeSkills;
+  certifications?: string[];
+  achievements?: string[];
+};
+
+// New Format Types (from prompt)
+type NewResumeBasics = {
+  full_name: string;
+  title?: string;
+  location?: {
+    city?: string;
+    region?: string;
+    country?: string;
+  };
+  contact?: {
+    email?: string;
+    phone?: string;
+    linkedin?: string;
+    github?: string;
+    portfolio?: string;
+  };
+};
+
+type NewResumeSummary = {
+  headline?: string;
+  highlights?: string[];
+};
+
+type NewResumeExperience = {
+  company: string;
+  role: string;
+  location?: string;
+  employment_type?: string;
+  start_date?: string;
+  end_date?: string | null;
+  is_current?: boolean;
+  summary?: string;
+  highlights?: string[];
+  tech_stack?: string[];
+};
+
+type NewResumeProject = {
+  name: string;
+  type?: string;
+  link?: string;
+  description?: string;
+  highlights?: string[];
+  tech_stack?: string[];
+};
+
+type NewResumeEducation = {
+  institution: string;
+  degree: string;
+  location?: string;
+  start_date?: string;
+  end_date?: string;
+  gpa?: string;
+  highlights?: string[];
+};
+
+type NewResumeSkillCategory = {
+  name: string;
+  items: string[];
+};
+
+type NewResumeData = {
+  basics?: NewResumeBasics;
+  summary?: NewResumeSummary;
+  experience?: NewResumeExperience[];
+  projects?: NewResumeProject[];
+  education?: NewResumeEducation[];
+  skills?: {
+    categories?: NewResumeSkillCategory[];
+  };
+  certifications?: string[];
+  achievements?: string[];
+  metadata?: {
+    target_role?: string;
+    experience_level?: string;
+    resume_version?: string;
+  };
+};
+
+// Helper function to format dates from YYYY-MM to readable format
+const formatDateRange = (startDate?: string, endDate?: string | null, isCurrent?: boolean): string => {
+  if (!startDate) return "";
+  
+  const formatDate = (dateStr: string): string => {
+    if (!dateStr) return "";
+    const [year, month] = dateStr.split("-");
+    if (!year) return "";
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthName = month ? monthNames[parseInt(month) - 1] : "";
+    return monthName ? `${monthName} ${year}` : year;
+  };
+  
+  const start = formatDate(startDate);
+  if (isCurrent || !endDate) {
+    return `${start} - Present`;
+  }
+  const end = formatDate(endDate);
+  return `${start} - ${end}`;
+};
+
+// Helper function to format contact info (handles empty phone)
+const formatContactInfo = (
+  contact: ResumeContact,
+  separator: " • " | " | " = " • "
+): string => {
+  const parts = [];
+  if (contact.phone && contact.phone.trim()) {
+    parts.push(contact.phone);
+  }
+  parts.push(contact.email);
+  if (contact.location && contact.location.trim()) {
+    parts.push(contact.location);
+  }
+  return parts.join(separator);
+};
+
+// Check if data is in new format
+const isNewFormat = (data: any): boolean => {
+  return (
+    data &&
+    typeof data === "object" &&
+    (data.basics || (data.summary && typeof data.summary === "object" && data.summary.headline !== undefined) || 
+     (data.experience && Array.isArray(data.experience) && data.experience.length > 0 && data.experience[0].start_date))
+  );
+};
+
+// Transform new format to old format
+const transformNewFormatToOld = (newData: NewResumeData): ResumeData => {
+  const basics: NewResumeBasics = newData.basics || { full_name: "" };
+  const contact = basics.contact || {};
+  const location = basics.location || {};
+  
+  // Format location string
+  const locationParts = [];
+  if (location.city) locationParts.push(location.city);
+  if (location.region) locationParts.push(location.region);
+  if (location.country) locationParts.push(location.country);
+  const locationStr = locationParts.join(", ");
+  
+  // Transform contact
+  const oldContact: ResumeContact = {
+    phone: contact.phone || "",
+    email: contact.email || "",
+    location: locationStr,
+  };
+  
+  // Transform summary
+  const summary = newData.summary;
+  let summaryText = "";
+  if (summary?.headline) {
+    summaryText = summary.headline;
+  }
+  if (summary?.highlights && summary.highlights.length > 0) {
+    if (summaryText) summaryText += " ";
+    summaryText += summary.highlights.join(" ");
+  }
+  
+  // Transform experience
+  const oldExperience: ResumeExperience[] = (newData.experience || []).map((exp) => ({
+    role: exp.role || "",
+    company: exp.company || "",
+    location: exp.location || "",
+    duration: formatDateRange(exp.start_date, exp.end_date, exp.is_current),
+    details: exp.highlights || (exp.summary ? [exp.summary] : []) || [],
+  }));
+  
+  // Transform projects
+  const oldProjects: ResumeProject[] = (newData.projects || []).map((proj) => {
+    const details = [];
+    if (proj.description) details.push(proj.description);
+    if (proj.highlights && proj.highlights.length > 0) {
+      details.push(...proj.highlights);
+    }
+    return {
+      title: proj.name || "",
+      link: proj.link || undefined,
+      details: details.length > 0 ? details : [],
+    };
+  });
+  
+  // Transform education
+  const oldEducation: ResumeEducation[] = (newData.education || []).map((edu) => ({
+    degree: edu.degree || "",
+    university: edu.institution || "",
+    duration: formatDateRange(edu.start_date, edu.end_date),
+    cgpa: edu.gpa || undefined,
+  }));
+  
+  // Transform skills
+  const oldSkills: ResumeSkills = {};
+  if (newData.skills?.categories) {
+    newData.skills.categories.forEach((category) => {
+      const catName = category.name.toLowerCase();
+      if (catName.includes("frontend")) {
+        oldSkills.frontend = category.items || [];
+      } else if (catName.includes("backend")) {
+        oldSkills.backend = category.items || [];
+      } else if (catName.includes("database")) {
+        oldSkills.database = category.items || [];
+      } else if (catName.includes("cloud") || catName.includes("devops") || catName.includes("tools") || catName.includes("platform")) {
+        oldSkills.tools = [...(oldSkills.tools || []), ...(category.items || [])];
+      } else if (catName.includes("soft")) {
+        oldSkills.soft_skills = category.items || [];
+      } else if (!oldSkills.tools) {
+        oldSkills.tools = category.items || [];
+      }
+    });
+  }
+  
+  return {
+    name: basics.full_name || "",
+    title: basics.title,
+    contact: oldContact,
+    summary: summaryText,
+    summaryHeadline: summary?.headline,
+    summaryHighlights: summary?.highlights,
+    experience: oldExperience,
+    projects: oldProjects,
+    education: oldEducation,
+    skills: oldSkills,
+    certifications: newData.certifications,
+    achievements: newData.achievements,
+  };
 };
 
 // Template rendering functions
@@ -104,17 +333,21 @@ const renderResumeTemplate = (
 };
 
 const renderModernTemplate = (data: ResumeData): string => {
-  const contactInfo = `${data.contact.phone} • ${data.contact.email} • ${data.contact.location}`;
+  const contactInfo = formatContactInfo(data.contact, " • ");
 
   let html = `
     <div class="resume-header">
       <h1>${data.name}</h1>
+      ${data.title ? `<div class="resume-title">${data.title}</div>` : ""}
       <div class="resume-contact">${contactInfo}</div>
     </div>
     
     <section class="resume-section">
       <h2>Professional Summary</h2>
-      <p>${data.summary}</p>
+      ${data.summaryHeadline ? `<p class="summary-headline">${data.summaryHeadline}</p>` : ""}
+      ${data.summaryHighlights && data.summaryHighlights.length > 0 
+        ? `<ul class="summary-highlights">${data.summaryHighlights.map(h => `<li>${h}</li>`).join("")}</ul>` 
+        : data.summary ? `<p>${data.summary}</p>` : ""}
     </section>
     
     <section class="resume-section">
@@ -230,11 +463,35 @@ const renderModernTemplate = (data: ResumeData): string => {
     html += `</div></section>`;
   }
 
+  // Add Certifications section
+  if (data.certifications && data.certifications.length > 0) {
+    html += `
+      <section class="resume-section">
+        <h2>Certifications</h2>
+        <ul class="certifications-list">
+          ${data.certifications.map(cert => `<li>${cert}</li>`).join("")}
+        </ul>
+      </section>
+    `;
+  }
+
+  // Add Achievements section
+  if (data.achievements && data.achievements.length > 0) {
+    html += `
+      <section class="resume-section">
+        <h2>Achievements</h2>
+        <ul class="achievements-list">
+          ${data.achievements.map(ach => `<li>${ach}</li>`).join("")}
+        </ul>
+      </section>
+    `;
+  }
+
   return html;
 };
 
 const renderMinimalTemplate = (data: ResumeData): string => {
-  const contactInfo = `${data.contact.phone} | ${data.contact.email} | ${data.contact.location}`;
+  const contactInfo = formatContactInfo(data.contact, " | ");
 
   let html = `
     <div class="resume-header">
@@ -244,7 +501,10 @@ const renderMinimalTemplate = (data: ResumeData): string => {
     
     <section class="resume-section">
       <h2>Summary</h2>
-      <p>${data.summary}</p>
+      ${data.summaryHeadline ? `<p class="summary-headline">${data.summaryHeadline}</p>` : ""}
+      ${data.summaryHighlights && data.summaryHighlights.length > 0 
+        ? `<ul class="summary-highlights">${data.summaryHighlights.map(h => `<li>${h}</li>`).join("")}</ul>` 
+        : data.summary ? `<p>${data.summary}</p>` : ""}
     </section>
     
     <section class="resume-section">
@@ -344,21 +604,49 @@ const renderMinimalTemplate = (data: ResumeData): string => {
     html += `</div></section>`;
   }
 
+  // Add Certifications section
+  if (data.certifications && data.certifications.length > 0) {
+    html += `
+      <section class="resume-section">
+        <h2>Certifications</h2>
+        <ul class="certifications-list">
+          ${data.certifications.map(cert => `<li>${cert}</li>`).join("")}
+        </ul>
+      </section>
+    `;
+  }
+
+  // Add Achievements section
+  if (data.achievements && data.achievements.length > 0) {
+    html += `
+      <section class="resume-section">
+        <h2>Achievements</h2>
+        <ul class="achievements-list">
+          ${data.achievements.map(ach => `<li>${ach}</li>`).join("")}
+        </ul>
+      </section>
+    `;
+  }
+
   return html;
 };
 
 const renderClassicTemplate = (data: ResumeData): string => {
-  const contactInfo = `${data.contact.phone} | ${data.contact.email} | ${data.contact.location}`;
+  const contactInfo = formatContactInfo(data.contact, " | ");
 
   let html = `
     <div class="resume-header">
       <h1>${data.name}</h1>
+      ${data.title ? `<div class="resume-title">${data.title}</div>` : ""}
       <div class="resume-contact">${contactInfo}</div>
     </div>
     
     <section class="resume-section">
       <h2>Professional Summary</h2>
-      <p>${data.summary}</p>
+      ${data.summaryHeadline ? `<p class="summary-headline">${data.summaryHeadline}</p>` : ""}
+      ${data.summaryHighlights && data.summaryHighlights.length > 0 
+        ? `<ul class="summary-highlights">${data.summaryHighlights.map(h => `<li>${h}</li>`).join("")}</ul>` 
+        : data.summary ? `<p>${data.summary}</p>` : ""}
     </section>
     
     <section class="resume-section">
@@ -474,15 +762,40 @@ const renderClassicTemplate = (data: ResumeData): string => {
     html += `</div></section>`;
   }
 
+  // Add Certifications section
+  if (data.certifications && data.certifications.length > 0) {
+    html += `
+      <section class="resume-section">
+        <h2>Certifications</h2>
+        <ul class="certifications-list">
+          ${data.certifications.map(cert => `<li>${cert}</li>`).join("")}
+        </ul>
+      </section>
+    `;
+  }
+
+  // Add Achievements section
+  if (data.achievements && data.achievements.length > 0) {
+    html += `
+      <section class="resume-section">
+        <h2>Achievements</h2>
+        <ul class="achievements-list">
+          ${data.achievements.map(ach => `<li>${ach}</li>`).join("")}
+        </ul>
+      </section>
+    `;
+  }
+
   return html;
 };
 
 const renderCreativeTemplate = (data: ResumeData): string => {
-  const contactInfo = `${data.contact.phone} • ${data.contact.email} • ${data.contact.location}`;
+  const contactInfo = formatContactInfo(data.contact, " • ");
 
   let html = `
     <div class="resume-header-creative">
       <h1>${data.name}</h1>
+      ${data.title ? `<div class="resume-title">${data.title}</div>` : ""}
       <div class="resume-contact">${contactInfo}</div>
     </div>
     
@@ -490,7 +803,10 @@ const renderCreativeTemplate = (data: ResumeData): string => {
       <div class="resume-left-column">
         <section class="resume-section">
           <h2>About</h2>
-          <p>${data.summary}</p>
+          ${data.summaryHeadline ? `<p class="summary-headline">${data.summaryHeadline}</p>` : ""}
+          ${data.summaryHighlights && data.summaryHighlights.length > 0 
+            ? `<ul class="summary-highlights">${data.summaryHighlights.map(h => `<li>${h}</li>`).join("")}</ul>` 
+            : data.summary ? `<p>${data.summary}</p>` : ""}
         </section>
         
         <section class="resume-section">
@@ -605,6 +921,30 @@ const renderCreativeTemplate = (data: ResumeData): string => {
 
   html += `</div></div>`;
 
+  // Add Certifications section
+  if (data.certifications && data.certifications.length > 0) {
+    html += `
+      <section class="resume-section">
+        <h2>Certifications</h2>
+        <ul class="certifications-list">
+          ${data.certifications.map(cert => `<li>${cert}</li>`).join("")}
+        </ul>
+      </section>
+    `;
+  }
+
+  // Add Achievements section
+  if (data.achievements && data.achievements.length > 0) {
+    html += `
+      <section class="resume-section">
+        <h2>Achievements</h2>
+        <ul class="achievements-list">
+          ${data.achievements.map(ach => `<li>${ach}</li>`).join("")}
+        </ul>
+      </section>
+    `;
+  }
+
   return html;
 };
 
@@ -632,8 +972,9 @@ export default function ResumePage() {
   const [generatingResume, setGeneratingResume] = useState(false);
   const [showResumeView, setShowResumeView] = useState(false); // Track if we're in resume-only view
 
-  // React Query hook
+  // React Query hooks
   const compareResumeMutation = useCompareResumeJD();
+  const generateResumeMutation = useGenerateResume();
 
   const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -790,62 +1131,42 @@ export default function ResumePage() {
       setGeneratingResume(true);
       setShowTemplate(false); // Hide template during generation
 
-      const response = await api.post(
-        "/resume/generate-resume",
-        {
-          resume_type: resumeMode,
-          resume_text: resumeText || "",
-          job_description: jobDescription || "",
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          timeout: 180000, // 3 minutes timeout for generation
-        }
-      );
+      const response = await generateResumeMutation.mutateAsync({
+        resume_type: resumeMode,
+        resume_text: resumeText || "",
+        job_description: jobDescription || "",
+      });
 
       // Validate response
-      if (!response?.data) {
+      if (!response) {
         throw new Error("Invalid response from server");
       }
 
-      // Handle different response structures
-      // The API might return the data in different formats:
-      // 1. response.data (direct JSON object) - most common
-      // 2. response.data.aiGeneratedResume (nested)
-      // 3. response.data.resume (alternative nesting)
-      // 4. response.data as string that needs parsing
-
       let resumeResponse: any = null;
 
-      console.log("Full API response:", response.data);
-
-      // First, check if the response data itself is the resume (direct JSON object)
-      if (response.data && typeof response.data === "object") {
-        // Check if response.data has the structure of a resume
+      if (response && typeof response === "object") {
+        // Check if response has the structure of a resume (direct JSON object)
         if (
-          response.data.name &&
-          response.data.contact &&
-          typeof response.data.contact === "object" &&
-          response.data.contact.phone &&
-          response.data.contact.email
+          response.name &&
+          response.contact &&
+          typeof response.contact === "object" &&
+          response.contact.email
         ) {
-          // Direct JSON object in response.data
-          resumeResponse = response.data;
-          console.log("✓ Found resume data directly in response.data");
+          // Direct JSON object in response - phone can be empty string
+          resumeResponse = response;
+          console.log("✓ Found resume data directly in response");
         }
         // Check nested structures
-        else if (response.data.aiGeneratedResume) {
-          resumeResponse = response.data.aiGeneratedResume;
-          console.log("✓ Found resume data in response.data.aiGeneratedResume");
-        } else if (response.data.resume) {
-          resumeResponse = response.data.resume;
-          console.log("✓ Found resume data in response.data.resume");
-        } else if (response.data.data) {
+        else if (response.aiGeneratedResume) {
+          resumeResponse = response.aiGeneratedResume;
+          console.log("✓ Found resume data in response.aiGeneratedResume");
+        } else if (response.resume) {
+          resumeResponse = response.resume;
+          console.log("✓ Found resume data in response.resume");
+        } else if (response.data) {
           // Sometimes API wraps in another data property
-          resumeResponse = response.data.data;
-          console.log("✓ Found resume data in response.data.data");
+          resumeResponse = response.data;
+          console.log("✓ Found resume data in response.data");
         }
       }
 
@@ -853,8 +1174,8 @@ export default function ResumePage() {
         console.error(
           "❌ Could not find resume data in response. Response structure:",
           {
-            keys: response.data ? Object.keys(response.data) : [],
-            data: response.data,
+            keys: response ? Object.keys(response) : [],
+            data: response,
           }
         );
         throw new Error(
@@ -867,17 +1188,31 @@ export default function ResumePage() {
 
       // Check if it's already a valid ResumeData object
       if (typeof resumeResponse === "object" && resumeResponse !== null) {
-        // Validate it has required fields
-        if (
+        // Check if it's the new format
+        if (isNewFormat(resumeResponse)) {
+          console.log("Detected new resume format, transforming...");
+          try {
+            jsonData = transformNewFormatToOld(resumeResponse as NewResumeData);
+            console.log("Successfully transformed new format resume data:", {
+              name: jsonData.name,
+              hasExperience: Array.isArray(jsonData.experience),
+              hasProjects: Array.isArray(jsonData.projects),
+              hasSkills: !!jsonData.skills,
+            });
+          } catch (transformError) {
+            console.error("Error transforming new format:", transformError);
+          }
+        }
+        // Check if it's the old format
+        else if (
           resumeResponse.name &&
           resumeResponse.contact &&
           typeof resumeResponse.contact === "object" &&
-          resumeResponse.contact.phone &&
           resumeResponse.contact.email
         ) {
-          // It's a valid ResumeData object
+          // It's a valid old ResumeData object
           jsonData = resumeResponse as ResumeData;
-          console.log("Successfully parsed JSON resume data:", {
+          console.log("Successfully parsed old format JSON resume data:", {
             name: jsonData.name,
             hasExperience: Array.isArray(jsonData.experience),
             hasProjects: Array.isArray(jsonData.projects),
@@ -889,9 +1224,13 @@ export default function ResumePage() {
       } else if (typeof resumeResponse === "string") {
         try {
           const parsed = JSON.parse(resumeResponse);
-          if (parsed.name && parsed.contact) {
+          if (isNewFormat(parsed)) {
+            console.log("Detected new format in string, transforming...");
+            jsonData = transformNewFormatToOld(parsed as NewResumeData);
+            console.log("Successfully transformed new format from string:", jsonData);
+          } else if (parsed.name && parsed.contact) {
             jsonData = parsed as ResumeData;
-            console.log("Parsed string JSON resume data:", jsonData);
+            console.log("Parsed string JSON resume data (old format):", jsonData);
           }
         } catch (parseError) {
           console.error("Failed to parse JSON string:", parseError);

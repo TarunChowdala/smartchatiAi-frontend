@@ -325,6 +325,7 @@ export default function ChatPage() {
 
     // Create new session if one doesn't exist
     let sessionId = currentSessionId;
+    const isNewSession = !sessionId;
     if (!sessionId) {
       const sessionName = generateSessionName(input);
       sessionId = await startNewSession(sessionName, input);
@@ -341,20 +342,23 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    //storing usermessage in current session
+    // Get messagesRef for storing messages
     const messagesRef = collection(
       db,
       "sessions",
       sessionId,
       "messages"
     );
-    await addDoc(messagesRef, {
-      id: uuidv4(),
-      content: input,
-      sender: "user",
-      timestamp: serverTimestamp(),
-      type: "text",
-    });
+
+    if (!isNewSession) {
+      await addDoc(messagesRef, {
+        id: uuidv4(),
+        content: input,
+        sender: "user",
+        timestamp: serverTimestamp(),
+        type: "text",
+      });
+    }
 
     //Updating the current session with latest info
     const sessionRef = doc(db, "sessions", sessionId);
@@ -484,8 +488,7 @@ export default function ChatPage() {
         </div>
         
         <div
-          className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-muted scrollbar-track-transparent"
-          style={{ scrollbarWidth: "thin" }}
+          className="flex-1 overflow-y-auto p-2 custom-scrollbar"
         >
           {isLoadingSessions ? (
             <div className="flex items-center justify-center p-4">
