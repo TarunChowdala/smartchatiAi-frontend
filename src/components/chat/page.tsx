@@ -568,7 +568,6 @@ export default function ChatPage() {
         <CardContent
           ref={chatContainerRef}
           className="card-inner-container flex-1 p-4 overflow-y-auto space-y-4 flex flex-col"
-          style={{ scrollbarWidth: "none" }}
         >
           {messages.length === 0 ? (
             <div className="flex-1 flex items-center justify-center">

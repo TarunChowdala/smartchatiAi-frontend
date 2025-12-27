@@ -259,8 +259,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <main
             className="flex-1 w-full overflow-auto flex justify-center"
             style={{
-              maxHeight: "calc(100vh - 65px)",
-              scrollbarWidth: "none",
+              maxHeight: "calc(100vh - 65px)",     
+              overflow: "hidden",
             }}
           >
             {children}

@@ -11,7 +11,7 @@ const redirectToLogin = () => {
 const url =
   window.location.hostname === "localhost"
     ? "http://localhost:8000/"
-    : "https://smartchatai-fastapi.onrender.com/";
+    : "https://smartchatai-backend.onrender.com/"
 
 const api = axios.create({
   baseURL: url,
