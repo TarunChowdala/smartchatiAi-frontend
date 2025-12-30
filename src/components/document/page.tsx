@@ -9,6 +9,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import MessageContent from "../chat/MessageContent";
 import toast, { Toaster } from "react-hot-toast";
 import { useUploadDocument, useDocumentStatus, useAskDocument, useDeleteDocument } from "@/hooks/document/useDocument";
@@ -31,6 +41,7 @@ export default function DocumentChatPage() {
   const [uploadingDocument, setUploadingDocument] = useState(false);
 
   const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // React Query hooks
   const uploadDocumentMutation = useUploadDocument();
@@ -218,12 +229,13 @@ export default function DocumentChatPage() {
     }
   };
 
-  const handleDeleteDocument = async () => {
+  const handleDeleteClick = () => {
     if (!currentDocumentId) return;
+    setDeleteDialogOpen(true);
+  };
 
-    if (!confirm("Are you sure you want to delete this document? This action cannot be undone.")) {
-      return;
-    }
+  const handleDeleteConfirm = async () => {
+    if (!currentDocumentId) return;
 
     try {
       await deleteDocumentMutation.mutateAsync(currentDocumentId);
@@ -232,6 +244,7 @@ export default function DocumentChatPage() {
         position: "top-right",
       });
       removeFile();
+      setDeleteDialogOpen(false);
     } catch (error: any) {
       console.error("Error deleting document:", error);
       const errorMessage =
@@ -337,7 +350,7 @@ export default function DocumentChatPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={handleDeleteDocument}
+                  onClick={handleDeleteClick}
                   className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                   disabled={deleteDocumentMutation.isPending}
                   title="Delete document"
@@ -482,6 +495,46 @@ export default function DocumentChatPage() {
           </>
         )}
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog 
+        open={deleteDialogOpen} 
+        onOpenChange={(open: boolean) => {
+          // Prevent closing during API call
+          if (!open && deleteDocumentMutation.isPending) {
+            return;
+          }
+          setDeleteDialogOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this document? This action cannot be undone and all chat history related to this document will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                if (!deleteDocumentMutation.isPending) {
+                  setDeleteDialogOpen(false);
+                }
+              }}
+              disabled={deleteDocumentMutation.isPending}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteDocumentMutation.isPending}
+            >
+              {deleteDocumentMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

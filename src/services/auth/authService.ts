@@ -1,4 +1,5 @@
 import api from "@/lib/api";
+import { encryptPassword } from "@/utils/encryption";
 
 export interface LoginRequest {
   email: string;
@@ -47,12 +48,18 @@ export interface UpdatePasswordRequest {
 
 export const authService = {
   login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const response = await api.post("/auth/login", data);
+    const response = await api.post("/auth/login", {
+      email: data.email,
+      password: encryptPassword(data.password),
+    });
     return response.data;
   },
 
   signup: async (data: SignupRequest): Promise<LoginResponse> => {
-    const response = await api.post("/auth/signup", data);
+    const response = await api.post("/auth/signup", {
+      ...data,
+      password: encryptPassword(data.password),
+    });
     return response.data;
   },
 
@@ -72,7 +79,10 @@ export const authService = {
   },
 
   updatePassword: async (data: UpdatePasswordRequest): Promise<void> => {
-    await api.post("/auth/update-password", data);
+    await api.post("/auth/update-password", {
+      currentPassword: encryptPassword(data.currentPassword),
+      newPassword: encryptPassword(data.newPassword),
+    });
   },
 };
 
