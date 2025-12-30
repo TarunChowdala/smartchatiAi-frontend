@@ -14,6 +14,8 @@ import SignupPage from "./pages/Signup";
 import ProtectedRoute from "./pages/ProtectedRoute";
 import { ProfileProvider } from "./components/ProfileContext";
 import { CurrentSessionProvider } from "./components/CurrentSession";
+import { DocumentSessionProvider } from "./components/DocumentSession";
+import { ResumeSessionProvider } from "./components/ResumeSession";
 import NotFound from "./pages/Notfound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -24,7 +26,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ProfileProvider>
         <CurrentSessionProvider>
-          <ThemeProvider>
+          <DocumentSessionProvider>
+            <ResumeSessionProvider>
+              <ThemeProvider>
             <Router>
               <Routes>
               <Route path="/" element={<HomePage />} />
@@ -67,7 +71,9 @@ function App() {
               <Route path="*" element={<NotFound />} />
               </Routes>
             </Router>
-          </ThemeProvider>
+              </ThemeProvider>
+            </ResumeSessionProvider>
+          </DocumentSessionProvider>
         </CurrentSessionProvider>
       </ProfileProvider>
     </QueryClientProvider>

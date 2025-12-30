@@ -22,25 +22,26 @@ import {
 import MessageContent from "../chat/MessageContent";
 import toast, { Toaster } from "react-hot-toast";
 import { useUploadDocument, useDocumentStatus, useAskDocument, useDeleteDocument } from "@/hooks/document/useDocument";
-
-type Message = {
-  id: string;
-  content: string;
-  role: "user" | "assistant";
-};
+import { useDocumentSession, DocumentMessage } from "../DocumentSession";
 
 export default function DocumentChatPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const {
+    currentDocumentId,
+    setCurrentDocumentId,
+    messages,
+    setMessages,
+    uploadedFileName,
+    setUploadedFileName,
+  } = useDocumentSession();
+
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [activeTab, setActiveTab] = useState("upload");
+  const [activeTab, setActiveTab] = useState(currentDocumentId ? "chat" : "upload");
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingDocument, setUploadingDocument] = useState(false);
-
-  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // React Query hooks
@@ -60,7 +61,7 @@ export default function DocumentChatPage() {
   // Handle document status updates
   useEffect(() => {
     if (documentStatus?.ready) {
-      const aiMessage: Message = {
+      const aiMessage: DocumentMessage = {
         id: Date.now().toString(),
         content: `I've analyzed your document. What would you like to know about this document?`,
         role: "assistant",
@@ -69,13 +70,14 @@ export default function DocumentChatPage() {
       setUploadingDocument(false);
       setIsLoading(false);
     }
-  }, [documentStatus]);
+  }, [documentStatus, setMessages]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadedFile(file);
+    setUploadedFileName(file.name);
     setActiveTab("chat");
     setIsLoading(true);
     setError("");
@@ -98,6 +100,7 @@ export default function DocumentChatPage() {
           }
         );
         setUploadedFile(null);
+        setUploadedFileName(null);
         setError("File size exceeds 10MB limit");
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
@@ -138,6 +141,7 @@ export default function DocumentChatPage() {
       }
 
       setUploadedFile(null);
+      setUploadedFileName(null);
       setActiveTab("upload");
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -147,10 +151,10 @@ export default function DocumentChatPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !uploadedFile) return;
+    if (!input.trim() || !currentDocumentId) return;
 
     // Add user message
-    const userMessage: Message = {
+    const userMessage: DocumentMessage = {
       id: Date.now().toString(),
       content: input,
       role: "user",
@@ -162,11 +166,11 @@ export default function DocumentChatPage() {
 
     try {
       const response = await askDocumentMutation.mutateAsync({
-        document_id: currentDocumentId!,
+        document_id: currentDocumentId,
         question: input,
       });
 
-      const aiMessage: Message = {
+      const aiMessage: DocumentMessage = {
         id: (Date.now() + 1).toString(),
         content: response.answer,
         role: "assistant",
@@ -189,7 +193,7 @@ export default function DocumentChatPage() {
         });
 
         // Add error message to chat
-        const errorMessageObj: Message = {
+        const errorMessageObj: DocumentMessage = {
           id: (Date.now() + 1).toString(),
           content: errorMessage,
           role: "assistant",
@@ -207,7 +211,7 @@ export default function DocumentChatPage() {
           },
         });
 
-        const errorMessageObj: Message = {
+        const errorMessageObj: DocumentMessage = {
           id: (Date.now() + 1).toString(),
           content: errorMessage,
           role: "assistant",
@@ -221,6 +225,7 @@ export default function DocumentChatPage() {
 
   const removeFile = () => {
     setUploadedFile(null);
+    setUploadedFileName(null);
     setMessages([]);
     setActiveTab("upload");
     setCurrentDocumentId(null);
@@ -302,10 +307,10 @@ export default function DocumentChatPage() {
 
       <Card
         className={`flex-1 overflow-hidden flex flex-col ${
-          uploadedFile ? "document-chat-card-container" : ""
+          (uploadedFile || currentDocumentId) ? "document-chat-card-container" : ""
         }`}
       >
-        {!uploadedFile ? (
+        {!uploadedFile && !currentDocumentId ? (
           <CardContent className="flex flex-col items-center justify-center h-full p-6 sma upload document-upload-card-inner-container">
             <div className="w-full max-w-md flex flex-col items-center justify-center p-6 sm:p-4 border-2 border-dashed rounded-lg">
               <Upload className="h-12 w-12 text-muted-foreground mb-4" />
@@ -340,11 +345,13 @@ export default function DocumentChatPage() {
               <div className="flex items-center gap-2">
                 <File className="h-4 w-4" />
                 <span className="text-sm font-medium truncate max-w-[200px]">
-                  {uploadedFile.name}
+                  {uploadedFile?.name || uploadedFileName || "Document"}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  ({Math.round(uploadedFile.size / 1024)} KB)
-                </span>
+                {uploadedFile && (
+                  <span className="text-xs text-muted-foreground">
+                    ({Math.round(uploadedFile.size / 1024)} KB)
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Button

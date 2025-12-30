@@ -26,17 +26,7 @@ import toast, { Toaster } from "react-hot-toast";
 import html2pdf from "html2pdf.js";
 import "./styles.css";
 import { useCompareResumeJD, useGenerateResume } from "@/hooks/resume/useResume";
-
-type AnalysisResult = {
-  score: number;
-  strengths: string[];
-  weaknesses: string[];
-  suggestions: string[];
-  keywords: string[];
-  matchScore: number;
-  missingKeywords: string[];
-  recommendedKeywords: string[];
-};
+import { useResumeSession, AnalysisResult } from "../ResumeSession";
 
 // Resume JSON Data Types - Old Format (for backward compatibility)
 type ResumeContact = {
@@ -949,28 +939,32 @@ const renderCreativeTemplate = (data: ResumeData): string => {
 };
 
 export default function ResumePage() {
+  const {
+    jobDescription,
+    setJobDescription,
+    resumeMode,
+    setResumeMode,
+    selectedTemplate,
+    setSelectedTemplate,
+    resumeData,
+    setResumeData,
+    analysisResult,
+    setAnalysisResult,
+    showTemplate,
+    setShowTemplate,
+    showResumeView,
+    setShowResumeView,
+    aiGeneratedResumeHtml,
+    setAiGeneratedResumeHtml,
+  } = useResumeSession();
+
   const [uploadedResume, setUploadedResume] = useState<File | null>(null);
-  const [jobDescription, setJobDescription] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
-    null
-  );
-  const [showTemplate, setShowTemplate] = useState(false);
-  const [aiGeneratedResumeHtml, setAiGeneratedResumeHtml] =
-    useState<string>("");
   const [isInitialized, setIsInitialized] = useState(false);
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const editableDivRef = useRef<HTMLDivElement>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<
-    "modern" | "minimal" | "classic" | "creative"
-  >("modern");
-  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
-  const [resumeMode, setResumeMode] = useState<"jd_resume" | "enhance_resume">(
-    "enhance_resume"
-  );
   const [generatingResume, setGeneratingResume] = useState(false);
-  const [showResumeView, setShowResumeView] = useState(false); // Track if we're in resume-only view
 
   // React Query hooks
   const compareResumeMutation = useCompareResumeJD();
