@@ -1131,7 +1131,6 @@ export default function ResumePage() {
         job_description: jobDescription || "",
       });
 
-      // Validate response
       if (!response) {
         throw new Error("Invalid response from server");
       }
@@ -1139,18 +1138,20 @@ export default function ResumePage() {
       let resumeResponse: any = null;
 
       if (response && typeof response === "object") {
-        // Check if response has the structure of a resume (direct JSON object)
-        if (
+        if (response.basics && typeof response.basics === "object") {
+          resumeResponse = response;
+          console.log("✓ Found new format resume data directly in response (basics)");
+        }
+        else if (
           response.name &&
           response.contact &&
           typeof response.contact === "object" &&
           response.contact.email
         ) {
-          // Direct JSON object in response - phone can be empty string
           resumeResponse = response;
-          console.log("✓ Found resume data directly in response");
+          console.log("✓ Found old format resume data directly in response");
         }
-        // Check nested structures
+        // Check nested 
         else if (response.aiGeneratedResume) {
           resumeResponse = response.aiGeneratedResume;
           console.log("✓ Found resume data in response.aiGeneratedResume");
@@ -1897,7 +1898,7 @@ export default function ResumePage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.5 }}
-            className="flex-1 flex flex-col"
+            className="flex-1 flex flex-col overflow-y-auto custom-scrollbar"
           >
             <div className="flex items-center gap-2 mb-4">
               <Button
@@ -2037,7 +2038,7 @@ export default function ResumePage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.5 }}
-            className="flex-1 flex flex-col"
+            className="flex-1 flex flex-col overflow-y-auto custom-scrollbar"
           >
             <div className="flex items-center gap-2 mb-4">
               <Button
