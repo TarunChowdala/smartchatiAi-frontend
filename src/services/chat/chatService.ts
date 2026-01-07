@@ -18,11 +18,12 @@ export interface SendMessageRequest {
   user_id: string;
   message: string;
   model_name: string;
-  session_id: string;
+  session_id?: string | null;
 }
 
 export interface SendMessageResponse {
   reply: string;
+  session_id: string;
 }
 
 export interface SessionMessage {

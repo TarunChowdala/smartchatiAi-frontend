@@ -34,6 +34,7 @@ export interface User {
   name: string;
   profileImage?: string;
   id?: string;
+  role?: string;
 }
 
 export interface UpdateMeRequest {

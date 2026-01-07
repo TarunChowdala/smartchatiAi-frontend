@@ -17,7 +17,7 @@ export const useDocumentStatus = (documentId: string | null, enabled: boolean = 
       if (data?.ready) {
         return false; // Stop polling when ready
       }
-      return 20000; // Poll every 20 seconds
+      return 3000; // Poll every 3 seconds
     },
   });
 };

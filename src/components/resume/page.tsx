@@ -8,12 +8,12 @@ import {
   X,
   CheckCircle,
   AlertCircle,
-  Download,
   Sparkles,
   Loader2,
   FileText,
   Search,
   Wand2,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,10 +23,12 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import toast, { Toaster } from "react-hot-toast";
-import html2pdf from "html2pdf.js";
 import "./styles.css";
-import { useCompareResumeJD, useGenerateResume } from "@/hooks/resume/useResume";
+import "./templates/ResumeTemplates.css";
+import { useCompareResumeJD, useGenerateResume, useGeneratePDF } from "@/hooks/resume/useResume";
 import { useResumeSession, AnalysisResult } from "../ResumeSession";
+import { useMyUsage } from "@/hooks/usage/useUsage";
+import { getTemplate, type TemplateType, type ResumeData as TemplateResumeData } from "./templates";
 
 // Resume JSON Data Types - Old Format (for backward compatibility)
 type ResumeContact = {
@@ -303,639 +305,118 @@ const transformNewFormatToOld = (newData: NewResumeData): ResumeData => {
   };
 };
 
-// Template rendering functions
-const renderResumeTemplate = (
-  data: ResumeData,
-  template: "modern" | "minimal" | "classic" | "creative"
-): string => {
-  switch (template) {
-    case "modern":
-      return renderModernTemplate(data);
-    case "minimal":
-      return renderMinimalTemplate(data);
-    case "classic":
-      return renderClassicTemplate(data);
-    case "creative":
-      return renderCreativeTemplate(data);
-    default:
-      return renderModernTemplate(data);
-  }
-};
+// Transform old format to new format for PDF API
+const transformOldFormatToNew = (oldData: ResumeData): NewResumeData => {
+  // Parse location from contact.location string (format: "City, Region, Country")
+  const locationParts = oldData.contact.location ? oldData.contact.location.split(",").map(s => s.trim()) : [];
+  const location = locationParts.length > 0 ? {
+    city: locationParts[0] || undefined,
+    region: locationParts[1] || undefined,
+    country: locationParts[2] || locationParts.slice(1).join(", ") || undefined,
+  } : undefined;
 
-const renderModernTemplate = (data: ResumeData): string => {
-  const contactInfo = formatContactInfo(data.contact, " • ");
-
-  let html = `
-    <div class="resume-header">
-      <h1>${data.name}</h1>
-      ${data.title ? `<div class="resume-title">${data.title}</div>` : ""}
-      <div class="resume-contact">${contactInfo}</div>
-    </div>
+  // Parse duration to extract dates (format: "Jan 2020 - Present" or "Jan 2020 - Dec 2022")
+  const parseDuration = (duration: string): { start_date?: string; end_date?: string | null; is_current?: boolean } => {
+    if (!duration) return {};
+    const isCurrent = duration.toLowerCase().includes("present");
+    const parts = duration.split("-").map(s => s.trim());
+    if (parts.length < 1) return {};
     
-    <section class="resume-section">
-      <h2>Professional Summary</h2>
-      ${data.summaryHeadline ? `<p class="summary-headline">${data.summaryHeadline}</p>` : ""}
-      ${data.summaryHighlights && data.summaryHighlights.length > 0 
-        ? `<ul class="summary-highlights">${data.summaryHighlights.map(h => `<li>${h}</li>`).join("")}</ul>` 
-        : data.summary ? `<p>${data.summary}</p>` : ""}
-    </section>
-    
-    <section class="resume-section">
-      <h2>Professional Experience</h2>
-  `;
+    const parseDate = (dateStr: string): string | undefined => {
+      if (!dateStr || dateStr.toLowerCase() === "present") return undefined;
+      const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+      const parts = dateStr.trim().split(" ");
+      if (parts.length >= 2) {
+        const month = monthNames.indexOf(parts[0].toLowerCase());
+        const year = parts[1];
+        if (month >= 0 && year) {
+          return `${year}-${String(month + 1).padStart(2, "0")}`;
+        }
+      } else if (parts.length === 1 && /^\d{4}$/.test(parts[0])) {
+        return `${parts[0]}-01`;
+      }
+      return undefined;
+    };
 
-  data.experience.forEach((exp) => {
-    html += `
-      <div class="resume-experience-item">
-        <div class="exp-header">
-          <strong>${exp.role}</strong>
-          <span class="exp-duration">${exp.duration}</span>
-        </div>
-        <div class="exp-company">${exp.company}${
-      exp.location ? ` • ${exp.location}` : ""
-    }</div>
-        <ul>
-          ${exp.details.map((detail) => `<li>${detail}</li>`).join("")}
-        </ul>
-      </div>
-    `;
+    return {
+      start_date: parseDate(parts[0]),
+      end_date: isCurrent ? null : (parts[1] ? parseDate(parts[1]) : undefined),
+      is_current: isCurrent,
+    };
+  };
+
+  // Transform experience
+  const newExperience: NewResumeExperience[] = oldData.experience.map((exp) => {
+    const dateInfo = parseDuration(exp.duration);
+    return {
+      company: exp.company,
+      role: exp.role,
+      location: exp.location || undefined,
+      start_date: dateInfo.start_date,
+      end_date: dateInfo.end_date,
+      is_current: dateInfo.is_current,
+      highlights: exp.details || [],
+    };
   });
 
-  html += `</section>`;
+  // Transform projects
+  const newProjects: NewResumeProject[] = oldData.projects.map((proj) => ({
+    name: proj.title,
+    link: proj.link,
+    highlights: proj.details || [],
+  }));
 
-  if (data.projects && data.projects.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Projects</h2>
-    `;
-    data.projects.forEach((project) => {
-      const projectLink =
-        project.link && project.link.trim()
-          ? project.link.startsWith("http")
-            ? project.link
-            : `https://${project.link}`
-          : null;
-      html += `
-        <div class="resume-project-item">
-          <div class="project-header">
-            <strong>${project.title}</strong>
-            ${
-              projectLink
-                ? ` <a href="${projectLink}" target="_blank" rel="noopener noreferrer">(${project.link})</a>`
-                : ""
-            }
-          </div>
-          <ul>
-            ${project.details.map((detail) => `<li>${detail}</li>`).join("")}
-          </ul>
-        </div>
-      `;
-    });
-    html += `</section>`;
-  }
-
-  if (data.education && data.education.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Education</h2>
-    `;
-    data.education.forEach((edu) => {
-      html += `
-        <div class="resume-education-item">
-          <div class="exp-header">
-            <div>
-              <strong>${edu.degree}</strong>
-              <div class="exp-company">${edu.university}</div>
-            </div>
-            <span class="exp-duration">${edu.duration}${
-        edu.cgpa ? ` • CGPA: ${edu.cgpa}` : ""
-      }</span>
-          </div>
-        </div>
-      `;
-    });
-    html += `</section>`;
-  }
-
-  if (data.skills) {
-    html += `
-      <section class="resume-section">
-        <h2>Skills</h2>
-        <div class="resume-skills-grid">
-    `;
-
-    if (data.skills.frontend && data.skills.frontend.length > 0) {
-      html += `<div><strong>Frontend:</strong> ${data.skills.frontend.join(
-        ", "
-      )}</div>`;
-    }
-    if (data.skills.backend && data.skills.backend.length > 0) {
-      html += `<div><strong>Backend:</strong> ${data.skills.backend.join(
-        ", "
-      )}</div>`;
-    }
-    if (data.skills.database && data.skills.database.length > 0) {
-      html += `<div><strong>Database:</strong> ${data.skills.database.join(
-        ", "
-      )}</div>`;
-    }
-    if (data.skills.tools && data.skills.tools.length > 0) {
-      html += `<div><strong>Tools:</strong> ${data.skills.tools.join(
-        ", "
-      )}</div>`;
-    }
-    if (data.skills.soft_skills && data.skills.soft_skills.length > 0) {
-      html += `<div><strong>Soft Skills:</strong> ${data.skills.soft_skills.join(
-        ", "
-      )}</div>`;
-    }
-
-    html += `</div></section>`;
-  }
-
-  // Add Certifications section
-  if (data.certifications && data.certifications.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Certifications</h2>
-        <ul class="certifications-list">
-          ${data.certifications.map(cert => `<li>${cert}</li>`).join("")}
-        </ul>
-      </section>
-    `;
-  }
-
-  // Add Achievements section
-  if (data.achievements && data.achievements.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Achievements</h2>
-        <ul class="achievements-list">
-          ${data.achievements.map(ach => `<li>${ach}</li>`).join("")}
-        </ul>
-      </section>
-    `;
-  }
-
-  return html;
-};
-
-const renderMinimalTemplate = (data: ResumeData): string => {
-  const contactInfo = formatContactInfo(data.contact, " | ");
-
-  let html = `
-    <div class="resume-header">
-      <h1>${data.name}</h1>
-      <div class="resume-contact">${contactInfo}</div>
-    </div>
-    
-    <section class="resume-section">
-      <h2>Summary</h2>
-      ${data.summaryHeadline ? `<p class="summary-headline">${data.summaryHeadline}</p>` : ""}
-      ${data.summaryHighlights && data.summaryHighlights.length > 0 
-        ? `<ul class="summary-highlights">${data.summaryHighlights.map(h => `<li>${h}</li>`).join("")}</ul>` 
-        : data.summary ? `<p>${data.summary}</p>` : ""}
-    </section>
-    
-    <section class="resume-section">
-      <h2>Experience</h2>
-  `;
-
-  data.experience.forEach((exp) => {
-    html += `
-      <div class="resume-experience-item">
-        <div class="exp-header">
-          <div>
-            <strong>${exp.role}</strong>
-            <div class="exp-company">${exp.company}${
-      exp.location ? `, ${exp.location}` : ""
-    }</div>
-          </div>
-          <span class="exp-duration">${exp.duration}</span>
-        </div>
-        <ul>
-          ${exp.details.map((detail) => `<li>${detail}</li>`).join("")}
-        </ul>
-      </div>
-    `;
+  // Transform education
+  const newEducation: NewResumeEducation[] = oldData.education.map((edu) => {
+    const dateInfo = parseDuration(edu.duration);
+    return {
+      institution: edu.university,
+      degree: edu.degree,
+      start_date: dateInfo.start_date,
+      end_date: dateInfo.end_date || undefined,
+      gpa: edu.cgpa,
+    };
   });
 
-  html += `</section>`;
-
-  if (data.projects && data.projects.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Projects</h2>
-    `;
-    data.projects.forEach((project) => {
-      const projectLink =
-        project.link && project.link.trim()
-          ? project.link.startsWith("http")
-            ? project.link
-            : `https://${project.link}`
-          : null;
-      html += `
-        <div class="resume-project-item">
-          <div class="project-header">
-            <strong>${project.title}</strong>
-            ${
-              projectLink
-                ? ` <a href="${projectLink}" target="_blank" rel="noopener noreferrer">(${project.link})</a>`
-                : ""
-            }
-          </div>
-          <ul>
-            ${project.details.map((detail) => `<li>${detail}</li>`).join("")}
-          </ul>
-        </div>
-      `;
-    });
-    html += `</section>`;
+  // Transform skills
+  const skillCategories: NewResumeSkillCategory[] = [];
+  if (oldData.skills.frontend && oldData.skills.frontend.length > 0) {
+    skillCategories.push({ name: "Frontend", items: oldData.skills.frontend });
+  }
+  if (oldData.skills.backend && oldData.skills.backend.length > 0) {
+    skillCategories.push({ name: "Backend", items: oldData.skills.backend });
+  }
+  if (oldData.skills.database && oldData.skills.database.length > 0) {
+    skillCategories.push({ name: "Database", items: oldData.skills.database });
+  }
+  if (oldData.skills.tools && oldData.skills.tools.length > 0) {
+    skillCategories.push({ name: "Tools & Technologies", items: oldData.skills.tools });
+  }
+  if (oldData.skills.soft_skills && oldData.skills.soft_skills.length > 0) {
+    skillCategories.push({ name: "Soft Skills", items: oldData.skills.soft_skills });
   }
 
-  if (data.education && data.education.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Education</h2>
-    `;
-    data.education.forEach((edu) => {
-      html += `
-        <div class="resume-education-item">
-          <div class="exp-header">
-            <div>
-              <strong>${edu.degree}</strong>
-              <div class="exp-company">${edu.university}</div>
-            </div>
-            <span class="exp-duration">${edu.duration}${
-        edu.cgpa ? ` | CGPA: ${edu.cgpa}` : ""
-      }</span>
-          </div>
-        </div>
-      `;
-    });
-    html += `</section>`;
-  }
-
-  if (data.skills) {
-    html += `
-      <section class="resume-section">
-        <h2>Skills</h2>
-        <div class="resume-skills-list">
-    `;
-
-    const allSkills: string[] = [];
-    if (data.skills.frontend) allSkills.push(...data.skills.frontend);
-    if (data.skills.backend) allSkills.push(...data.skills.backend);
-    if (data.skills.database) allSkills.push(...data.skills.database);
-    if (data.skills.tools) allSkills.push(...data.skills.tools);
-    if (data.skills.soft_skills) allSkills.push(...data.skills.soft_skills);
-
-    html += allSkills.join(" • ");
-    html += `</div></section>`;
-  }
-
-  // Add Certifications section
-  if (data.certifications && data.certifications.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Certifications</h2>
-        <ul class="certifications-list">
-          ${data.certifications.map(cert => `<li>${cert}</li>`).join("")}
-        </ul>
-      </section>
-    `;
-  }
-
-  // Add Achievements section
-  if (data.achievements && data.achievements.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Achievements</h2>
-        <ul class="achievements-list">
-          ${data.achievements.map(ach => `<li>${ach}</li>`).join("")}
-        </ul>
-      </section>
-    `;
-  }
-
-  return html;
-};
-
-const renderClassicTemplate = (data: ResumeData): string => {
-  const contactInfo = formatContactInfo(data.contact, " | ");
-
-  let html = `
-    <div class="resume-header">
-      <h1>${data.name}</h1>
-      ${data.title ? `<div class="resume-title">${data.title}</div>` : ""}
-      <div class="resume-contact">${contactInfo}</div>
-    </div>
-    
-    <section class="resume-section">
-      <h2>Professional Summary</h2>
-      ${data.summaryHeadline ? `<p class="summary-headline">${data.summaryHeadline}</p>` : ""}
-      ${data.summaryHighlights && data.summaryHighlights.length > 0 
-        ? `<ul class="summary-highlights">${data.summaryHighlights.map(h => `<li>${h}</li>`).join("")}</ul>` 
-        : data.summary ? `<p>${data.summary}</p>` : ""}
-    </section>
-    
-    <section class="resume-section">
-      <h2>Professional Experience</h2>
-  `;
-
-  data.experience.forEach((exp) => {
-    html += `
-      <div class="resume-experience-item">
-        <div class="exp-header">
-          <strong>${exp.role}</strong>
-          <span class="exp-duration">${exp.duration}</span>
-        </div>
-        <div class="exp-company">${exp.company}${
-      exp.location ? ` • ${exp.location}` : ""
-    }</div>
-        <ul>
-          ${exp.details.map((detail) => `<li>${detail}</li>`).join("")}
-        </ul>
-      </div>
-    `;
-  });
-
-  html += `</section>`;
-
-  if (data.projects && data.projects.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Key Projects</h2>
-    `;
-    data.projects.forEach((project) => {
-      const projectLink =
-        project.link && project.link.trim()
-          ? project.link.startsWith("http")
-            ? project.link
-            : `https://${project.link}`
-          : null;
-      html += `
-        <div class="resume-project-item">
-          <div class="project-header">
-            <strong>${project.title}</strong>
-            ${
-              projectLink
-                ? ` <a href="${projectLink}" target="_blank" rel="noopener noreferrer">(${project.link})</a>`
-                : ""
-            }
-          </div>
-          <ul>
-            ${project.details.map((detail) => `<li>${detail}</li>`).join("")}
-          </ul>
-        </div>
-      `;
-    });
-    html += `</section>`;
-  }
-
-  if (data.education && data.education.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Education</h2>
-    `;
-    data.education.forEach((edu) => {
-      html += `
-        <div class="resume-education-item">
-          <div class="exp-header">
-            <div>
-              <strong>${edu.degree}</strong>
-              <div class="exp-company">${edu.university}</div>
-            </div>
-            <span class="exp-duration">${edu.duration}${
-        edu.cgpa ? ` • CGPA: ${edu.cgpa}` : ""
-      }</span>
-          </div>
-        </div>
-      `;
-    });
-    html += `</section>`;
-  }
-
-  if (data.skills) {
-    html += `
-      <section class="resume-section">
-        <h2>Technical Skills</h2>
-        <div class="resume-skills-columns">
-    `;
-
-    if (data.skills.frontend && data.skills.frontend.length > 0) {
-      html += `<div><strong>Frontend Technologies:</strong> ${data.skills.frontend.join(
-        ", "
-      )}</div>`;
-    }
-    if (data.skills.backend && data.skills.backend.length > 0) {
-      html += `<div><strong>Backend Technologies:</strong> ${data.skills.backend.join(
-        ", "
-      )}</div>`;
-    }
-    if (data.skills.database && data.skills.database.length > 0) {
-      html += `<div><strong>Databases:</strong> ${data.skills.database.join(
-        ", "
-      )}</div>`;
-    }
-    if (data.skills.tools && data.skills.tools.length > 0) {
-      html += `<div><strong>Tools & Platforms:</strong> ${data.skills.tools.join(
-        ", "
-      )}</div>`;
-    }
-    if (data.skills.soft_skills && data.skills.soft_skills.length > 0) {
-      html += `<div><strong>Soft Skills:</strong> ${data.skills.soft_skills.join(
-        ", "
-      )}</div>`;
-    }
-
-    html += `</div></section>`;
-  }
-
-  // Add Certifications section
-  if (data.certifications && data.certifications.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Certifications</h2>
-        <ul class="certifications-list">
-          ${data.certifications.map(cert => `<li>${cert}</li>`).join("")}
-        </ul>
-      </section>
-    `;
-  }
-
-  // Add Achievements section
-  if (data.achievements && data.achievements.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Achievements</h2>
-        <ul class="achievements-list">
-          ${data.achievements.map(ach => `<li>${ach}</li>`).join("")}
-        </ul>
-      </section>
-    `;
-  }
-
-  return html;
-};
-
-const renderCreativeTemplate = (data: ResumeData): string => {
-  const contactInfo = formatContactInfo(data.contact, " • ");
-
-  let html = `
-    <div class="resume-header-creative">
-      <h1>${data.name}</h1>
-      ${data.title ? `<div class="resume-title">${data.title}</div>` : ""}
-      <div class="resume-contact">${contactInfo}</div>
-    </div>
-    
-    <div class="resume-content-wrapper">
-      <div class="resume-left-column">
-        <section class="resume-section">
-          <h2>About</h2>
-          ${data.summaryHeadline ? `<p class="summary-headline">${data.summaryHeadline}</p>` : ""}
-          ${data.summaryHighlights && data.summaryHighlights.length > 0 
-            ? `<ul class="summary-highlights">${data.summaryHighlights.map(h => `<li>${h}</li>`).join("")}</ul>` 
-            : data.summary ? `<p>${data.summary}</p>` : ""}
-        </section>
-        
-        <section class="resume-section">
-          <h2>Skills</h2>
-    `;
-
-  if (data.skills) {
-    if (data.skills.frontend && data.skills.frontend.length > 0) {
-      html += `<div class="skill-category"><strong>Frontend</strong><div class="skill-tags">${data.skills.frontend
-        .map((s) => `<span class="skill-tag">${s}</span>`)
-        .join("")}</div></div>`;
-    }
-    if (data.skills.backend && data.skills.backend.length > 0) {
-      html += `<div class="skill-category"><strong>Backend</strong><div class="skill-tags">${data.skills.backend
-        .map((s) => `<span class="skill-tag">${s}</span>`)
-        .join("")}</div></div>`;
-    }
-    if (data.skills.database && data.skills.database.length > 0) {
-      html += `<div class="skill-category"><strong>Database</strong><div class="skill-tags">${data.skills.database
-        .map((s) => `<span class="skill-tag">${s}</span>`)
-        .join("")}</div></div>`;
-    }
-    if (data.skills.tools && data.skills.tools.length > 0) {
-      html += `<div class="skill-category"><strong>Tools</strong><div class="skill-tags">${data.skills.tools
-        .map((s) => `<span class="skill-tag">${s}</span>`)
-        .join("")}</div></div>`;
-    }
-    if (data.skills.soft_skills && data.skills.soft_skills.length > 0) {
-      html += `<div class="skill-category"><strong>Soft Skills</strong><div class="skill-tags">${data.skills.soft_skills
-        .map((s) => `<span class="skill-tag">${s}</span>`)
-        .join("")}</div></div>`;
-    }
-  }
-
-  html += `</section>`;
-
-  if (data.education && data.education.length > 0) {
-    html += `
-        <section class="resume-section">
-          <h2>Education</h2>
-      `;
-    data.education.forEach((edu) => {
-      html += `
-          <div class="resume-education-item">
-            <strong>${edu.degree}</strong>
-            <div class="exp-company">${edu.university}</div>
-            <span class="edu-duration">${edu.duration}${
-        edu.cgpa ? ` • CGPA: ${edu.cgpa}` : ""
-      }</span>
-          </div>
-        `;
-    });
-    html += `</section>`;
-  }
-
-  html += `</div><div class="resume-right-column">`;
-
-  html += `
-      <section class="resume-section">
-        <h2>Professional Experience</h2>
-    `;
-
-  data.experience.forEach((exp) => {
-    html += `
-        <div class="resume-experience-item">
-          <div class="exp-header">
-            <strong>${exp.role}</strong>
-            <span class="exp-duration">${exp.duration}</span>
-          </div>
-          <div class="exp-company">${exp.company}${
-      exp.location ? ` • ${exp.location}` : ""
-    }</div>
-          <ul>
-            ${exp.details.map((detail) => `<li>${detail}</li>`).join("")}
-          </ul>
-        </div>
-      `;
-  });
-
-  html += `</section>`;
-
-  if (data.projects && data.projects.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Projects</h2>
-    `;
-    data.projects.forEach((project) => {
-      const projectLink =
-        project.link && project.link.trim()
-          ? project.link.startsWith("http")
-            ? project.link
-            : `https://${project.link}`
-          : null;
-      html += `
-        <div class="resume-project-item">
-          <div class="project-header">
-            <strong>${project.title}</strong>
-            ${
-              projectLink
-                ? ` <a href="${projectLink}" target="_blank" rel="noopener noreferrer">(${project.link})</a>`
-                : ""
-            }
-          </div>
-          <ul>
-            ${project.details.map((detail) => `<li>${detail}</li>`).join("")}
-          </ul>
-        </div>
-      `;
-    });
-    html += `</section>`;
-  }
-
-  html += `</div></div>`;
-
-  // Add Certifications section
-  if (data.certifications && data.certifications.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Certifications</h2>
-        <ul class="certifications-list">
-          ${data.certifications.map(cert => `<li>${cert}</li>`).join("")}
-        </ul>
-      </section>
-    `;
-  }
-
-  // Add Achievements section
-  if (data.achievements && data.achievements.length > 0) {
-    html += `
-      <section class="resume-section">
-        <h2>Achievements</h2>
-        <ul class="achievements-list">
-          ${data.achievements.map(ach => `<li>${ach}</li>`).join("")}
-        </ul>
-      </section>
-    `;
-  }
-
-  return html;
+  return {
+    basics: {
+      full_name: oldData.name,
+      title: oldData.title,
+      location,
+      contact: {
+        email: oldData.contact.email,
+        phone: oldData.contact.phone || undefined,
+      },
+    },
+    summary: {
+      headline: oldData.summaryHeadline,
+      highlights: oldData.summaryHighlights || (oldData.summary ? [oldData.summary] : []),
+    },
+    experience: newExperience,
+    projects: newProjects,
+    education: newEducation,
+    skills: skillCategories.length > 0 ? { categories: skillCategories } : undefined,
+    certifications: oldData.certifications,
+    achievements: oldData.achievements,
+  };
 };
 
 export default function ResumePage() {
@@ -969,6 +450,8 @@ export default function ResumePage() {
   // React Query hooks
   const compareResumeMutation = useCompareResumeJD();
   const generateResumeMutation = useGenerateResume();
+  const generatePDFMutation = useGeneratePDF();
+  const { data: myUsageData } = useMyUsage();
 
   const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -993,6 +476,20 @@ export default function ResumePage() {
         duration: 3000,
       });
       return;
+    }
+
+    // Check usage limits
+    if (myUsageData?.usage) {
+      const { resumes } = myUsageData.usage;
+      if (resumes.limit !== "unlimited" && resumes.current >= resumes.limit) {
+        toast.error(
+          `You have reached your resume analysis limit (${resumes.limit}). Please upgrade or wait for your limit to reset.`,
+          {
+            duration: 4000,
+          }
+        );
+        return;
+      }
     }
 
     setIsAnalyzing(true);
@@ -1121,6 +618,20 @@ export default function ResumePage() {
       return;
     }
 
+    // Check usage limits
+    if (myUsageData?.usage) {
+      const { resumes } = myUsageData.usage;
+      if (resumes.limit !== "unlimited" && resumes.current >= resumes.limit) {
+        toast.error(
+          `You have reached your resume generation limit (${resumes.limit}). Please upgrade or wait for your limit to reset.`,
+          {
+            duration: 4000,
+          }
+        );
+        return;
+      }
+    }
+
     try {
       setGeneratingResume(true);
       setShowTemplate(false); // Hide template during generation
@@ -1140,7 +651,6 @@ export default function ResumePage() {
       if (response && typeof response === "object") {
         if (response.basics && typeof response.basics === "object") {
           resumeResponse = response;
-          console.log("✓ Found new format resume data directly in response (basics)");
         }
         else if (
           response.name &&
@@ -1149,19 +659,13 @@ export default function ResumePage() {
           response.contact.email
         ) {
           resumeResponse = response;
-          console.log("✓ Found old format resume data directly in response");
         }
-        // Check nested 
         else if (response.aiGeneratedResume) {
           resumeResponse = response.aiGeneratedResume;
-          console.log("✓ Found resume data in response.aiGeneratedResume");
         } else if (response.resume) {
           resumeResponse = response.resume;
-          console.log("✓ Found resume data in response.resume");
         } else if (response.data) {
-          // Sometimes API wraps in another data property
           resumeResponse = response.data;
-          console.log("✓ Found resume data in response.data");
         }
       }
 
@@ -1185,15 +689,8 @@ export default function ResumePage() {
       if (typeof resumeResponse === "object" && resumeResponse !== null) {
         // Check if it's the new format
         if (isNewFormat(resumeResponse)) {
-          console.log("Detected new resume format, transforming...");
           try {
             jsonData = transformNewFormatToOld(resumeResponse as NewResumeData);
-            console.log("Successfully transformed new format resume data:", {
-              name: jsonData.name,
-              hasExperience: Array.isArray(jsonData.experience),
-              hasProjects: Array.isArray(jsonData.projects),
-              hasSkills: !!jsonData.skills,
-            });
           } catch (transformError) {
             console.error("Error transforming new format:", transformError);
           }
@@ -1205,14 +702,7 @@ export default function ResumePage() {
           typeof resumeResponse.contact === "object" &&
           resumeResponse.contact.email
         ) {
-          // It's a valid old ResumeData object
           jsonData = resumeResponse as ResumeData;
-          console.log("Successfully parsed old format JSON resume data:", {
-            name: jsonData.name,
-            hasExperience: Array.isArray(jsonData.experience),
-            hasProjects: Array.isArray(jsonData.projects),
-            hasSkills: !!jsonData.skills,
-          });
         } else {
           console.warn("Resume data missing required fields:", resumeResponse);
         }
@@ -1220,27 +710,17 @@ export default function ResumePage() {
         try {
           const parsed = JSON.parse(resumeResponse);
           if (isNewFormat(parsed)) {
-            console.log("Detected new format in string, transforming...");
             jsonData = transformNewFormatToOld(parsed as NewResumeData);
-            console.log("Successfully transformed new format from string:", jsonData);
           } else if (parsed.name && parsed.contact) {
             jsonData = parsed as ResumeData;
-            console.log("Parsed string JSON resume data (old format):", jsonData);
           }
         } catch (parseError) {
           console.error("Failed to parse JSON string:", parseError);
-          // Not JSON, will treat as HTML below
         }
       }
 
       if (jsonData) {
-        // It's JSON data - set it and render
-        console.log("Setting resume data and preparing to render");
         setResumeData(jsonData);
-        // Generate HTML immediately for immediate display
-        const html = renderResumeTemplate(jsonData, selectedTemplate);
-        setAiGeneratedResumeHtml(html);
-        console.log("Resume data set, HTML generated, length:", html.length);
 
         // Small delay for smooth transition
         await new Promise((resolve) => setTimeout(resolve, 300));
@@ -1262,8 +742,6 @@ export default function ResumePage() {
           }
         }, 500);
       } else {
-        // It's HTML, use old transform method
-        console.log("Treating response as HTML");
         setAiGeneratedResumeHtml(transformResumeHtml(resumeResponse));
 
         // Small delay for smooth transition
@@ -1328,150 +806,75 @@ export default function ResumePage() {
     });
   };
 
-  const handleDownloadPdf = async () => {
-    if (!editableDivRef.current) {
-      toast.error("No resume content to download");
+  const handleDownloadPDF = async () => {
+    if (!resumeData) {
+      toast.error("No resume data available to download.", {
+        duration: 3000,
+      });
       return;
     }
 
     try {
-      const element = editableDivRef.current;
+      // Transform old format to new format
+      let newFormatData: NewResumeData;
+      if (isNewFormat(resumeData)) {
+        // If already in new format, use it directly (but remove metadata if present)
+        const { metadata, ...dataWithoutMetadata } = resumeData as any;
+        newFormatData = dataWithoutMetadata as NewResumeData;
+      } else {
+        newFormatData = transformOldFormatToNew(resumeData);
+      }
 
-      // Show loading message
-      toast.loading("Generating PDF...", {
-        id: "pdf-loading",
-        duration: 10000,
+      // Ensure template_id matches the selected template
+      const templateId = selectedTemplate as "modern" | "minimal" | "classic";
+
+      toast.loading("Generating PDF...", { id: "pdf-download" });
+
+      const blob = await generatePDFMutation.mutateAsync({
+        template_id: templateId,
+        resume_data: newFormatData,
       });
 
-      const opt = {
-        margin: [0.4, 0.4, 0.4, 0.4],
-        filename: `resume-${selectedTemplate}-${Date.now()}.pdf`,
-        image: {
-          type: "jpeg",
-          quality: 0.95,
-        },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          letterRendering: true,
-          logging: false,
-          backgroundColor: "#ffffff",
-          windowWidth: 1200,
-          windowHeight: 1600,
-          allowTaint: false,
-          removeContainer: true,
-        },
-        jsPDF: {
-          unit: "in",
-          format: "letter",
-          orientation: "portrait",
-          compress: true,
-          precision: 16,
-        },
-        pagebreak: {
-          mode: ["avoid-all", "css", "legacy"],
-          avoid: [
-            ".resume-section",
-            ".resume-experience-item",
-            ".resume-project-item",
-            ".resume-education-item",
-          ],
-        },
-      };
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `resume-${templateId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-      // Create a wrapper to ensure proper rendering
-      const wrapper = document.createElement("div");
-      wrapper.style.width = "8.5in";
-      wrapper.style.maxWidth = "8.5in";
-      wrapper.style.margin = "0 auto";
-      wrapper.style.padding = "0";
-      wrapper.style.backgroundColor = "#ffffff";
-      wrapper.style.position = "relative";
-
-      // Clone the element
-      const clonedElement = element.cloneNode(true) as HTMLElement;
-      clonedElement.style.width = "100%";
-      clonedElement.style.maxWidth = "100%";
-      clonedElement.style.margin = "0";
-      clonedElement.style.padding = "2rem 2.5rem";
-      clonedElement.style.boxSizing = "border-box";
-      clonedElement.style.backgroundColor = "#ffffff";
-
-      wrapper.appendChild(clonedElement);
-
-      // Append to body temporarily (off-screen)
-      const tempContainer = document.createElement("div");
-      tempContainer.style.position = "fixed";
-      tempContainer.style.left = "-9999px";
-      tempContainer.style.top = "0";
-      tempContainer.style.width = "8.5in";
-      tempContainer.style.backgroundColor = "#ffffff";
-      tempContainer.appendChild(wrapper);
-      document.body.appendChild(tempContainer);
-
-      // Wait a bit for rendering
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Generate PDF
-      await html2pdf().set(opt).from(wrapper).save();
-
-      // Cleanup
-      document.body.removeChild(tempContainer);
-
-      toast.dismiss("pdf-loading");
       toast.success("PDF downloaded successfully!", {
+        id: "pdf-download",
         duration: 3000,
       });
     } catch (error: any) {
       console.error("PDF generation error:", error);
-      toast.dismiss("pdf-loading");
-      toast.error("Failed to generate PDF. Please try again.", {
-        duration: 3000,
+      let errorMessage = "Failed to generate PDF. Please try again.";
+
+      if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.detail || "Invalid request. Please check your resume data.";
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage, {
+        id: "pdf-download",
+        duration: 5000,
       });
     }
   };
 
+
+  // Initialize when resume data is available
   useEffect(() => {
-    // Render resume when data is available and template is shown
-    if (resumeData && showTemplate && editableDivRef.current) {
-      console.log(
-        "Rendering resume with template:",
-        selectedTemplate,
-        "Data:",
-        resumeData
-      );
-      try {
-        const html = renderResumeTemplate(resumeData, selectedTemplate);
-        if (html && html.trim().length > 0) {
-          editableDivRef.current.innerHTML = html;
-          setAiGeneratedResumeHtml(html);
-          setIsInitialized(true);
-          console.log(
-            "Resume rendered successfully, HTML length:",
-            html.length
-          );
-        } else {
-          console.error("Generated HTML is empty");
-        }
-      } catch (error) {
-        console.error("Error rendering resume template:", error);
-      }
-    } else if (
-      aiGeneratedResumeHtml &&
-      !resumeData &&
-      showTemplate &&
-      editableDivRef.current
-    ) {
-      // Legacy HTML support (for backwards compatibility)
-      console.log("Rendering legacy HTML resume");
-      try {
-        editableDivRef.current.innerHTML = transformResumeHtml(
-          aiGeneratedResumeHtml
-        );
-        setIsInitialized(true);
-      } catch (error) {
-        console.error("Error rendering legacy HTML:", error);
-      }
+    if (resumeData && showTemplate) {
+      setIsInitialized(true);
     }
   }, [resumeData, selectedTemplate, showTemplate]);
 
@@ -1918,102 +1321,76 @@ export default function ResumePage() {
                     <Sparkles className="h-5 w-5 text-purple-500" />
                     AI Generated Resume Template
                   </CardTitle>
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownloadPdf}
-                      className="gap-2"
-                      disabled={!showTemplate || generatingResume}
-                    >
-                      <Download className="h-4 w-4" />
-                      Download PDF
-                    </Button>
-                  </motion.div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-2 mb-4 flex-wrap">
+                <div className="flex gap-2 mb-4 flex-wrap items-center justify-between">
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant={
+                        selectedTemplate === "modern" ? "default" : "outline"
+                      }
+                      onClick={() => {
+                        setSelectedTemplate("modern");
+                      }}
+                    >
+                      Modern
+                    </Button>
+                    <Button
+                      variant={
+                        selectedTemplate === "minimal" ? "default" : "outline"
+                      }
+                      onClick={() => {
+                        setSelectedTemplate("minimal");
+                      }}
+                    >
+                      Minimal
+                    </Button>
+                    <Button
+                      variant={
+                        selectedTemplate === "classic" ? "default" : "outline"
+                      }
+                      onClick={() => {
+                        setSelectedTemplate("classic");
+                      }}
+                    >
+                      Classic
+                    </Button>
+                  </div>
                   <Button
-                    variant={
-                      selectedTemplate === "modern" ? "default" : "outline"
-                    }
-                    onClick={() => {
-                      setSelectedTemplate("modern");
-                    }}
+                    onClick={handleDownloadPDF}
+                    disabled={!resumeData || generatePDFMutation.isPending}
+                    className="gap-2"
                   >
-                    Modern
-                  </Button>
-                  <Button
-                    variant={
-                      selectedTemplate === "minimal" ? "default" : "outline"
-                    }
-                    onClick={() => {
-                      setSelectedTemplate("minimal");
-                    }}
-                  >
-                    Minimal
-                  </Button>
-                  <Button
-                    variant={
-                      selectedTemplate === "classic" ? "default" : "outline"
-                    }
-                    onClick={() => {
-                      setSelectedTemplate("classic");
-                    }}
-                  >
-                    Classic
-                  </Button>
-                  <Button
-                    variant={
-                      selectedTemplate === "creative" ? "default" : "outline"
-                    }
-                    onClick={() => {
-                      setSelectedTemplate("creative");
-                    }}
-                  >
-                    Creative
+                    {generatePDFMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4" />
+                        Download PDF
+                      </>
+                    )}
                   </Button>
                 </div>
                 {!generatingResume && (
                   <>
-                    {resumeData || aiGeneratedResumeHtml ? (
-                      <>
-                        <motion.div
-                          key={`resume-${selectedTemplate}`}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5 }}
-                          ref={editableDivRef}
-                          className={`prose prose-sm dark:prose-invert border rounded-md p-4 bg-background text-foreground min-h-[400px] transition-colors duration-300 border-muted ${
-                            selectedTemplate === "modern"
-                              ? "resume-template-modern"
-                              : selectedTemplate === "minimal"
-                              ? "resume-template-minimal"
-                              : selectedTemplate === "classic"
-                              ? "resume-template-classic"
-                              : "resume-template-creative"
-                          }`}
-                          contentEditable={true}
-                          suppressContentEditableWarning={true}
-                          onInput={(e) => {
-                            setAiGeneratedResumeHtml(e.currentTarget.innerHTML);
-                          }}
-                          style={{ outline: "none", cursor: "text" }}
-                        />
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: 0.3 }}
-                          className="text-xs text-muted-foreground mt-2"
-                        >
-                          Click and edit your resume above. When ready, click
-                          "Download PDF".
-                        </motion.div>
-                      </>
+                    {resumeData ? (
+                      <motion.div
+                        key={`resume-${selectedTemplate}`}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="resume-preview-container"
+                        ref={editableDivRef}
+                      >
+                        {(() => {
+                          const TemplateComponent = getTemplate(selectedTemplate as TemplateType);
+                          return <TemplateComponent data={resumeData as TemplateResumeData} />;
+                        })()}
+                      </motion.div>
                     ) : (
                       <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
                         <FileText className="h-12 w-12 text-muted-foreground mb-4" />

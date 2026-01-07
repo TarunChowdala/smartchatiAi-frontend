@@ -14,6 +14,7 @@ interface Profile {
   profileImage: string;
   about?: string;
   password?: string;
+  role?: string;
 }
 
 interface ProfileContextType {

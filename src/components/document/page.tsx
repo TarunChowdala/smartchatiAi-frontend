@@ -23,6 +23,7 @@ import MessageContent from "../chat/MessageContent";
 import toast, { Toaster } from "react-hot-toast";
 import { useUploadDocument, useDocumentStatus, useAskDocument, useDeleteDocument } from "@/hooks/document/useDocument";
 import { useDocumentSession, DocumentMessage } from "../DocumentSession";
+import { useMyUsage } from "@/hooks/usage/useUsage";
 
 export default function DocumentChatPage() {
   const {
@@ -49,6 +50,7 @@ export default function DocumentChatPage() {
   const { data: documentStatus } = useDocumentStatus(currentDocumentId, !!currentDocumentId && uploadingDocument);
   const askDocumentMutation = useAskDocument();
   const deleteDocumentMutation = useDeleteDocument();
+  const { data: myUsageData } = useMyUsage();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -82,14 +84,40 @@ export default function DocumentChatPage() {
     setIsLoading(true);
     setError("");
 
+    // Check usage limits
+    if (myUsageData?.usage) {
+      const { documents } = myUsageData.usage;
+      if (documents.limit !== "unlimited" && documents.current >= documents.limit) {
+        toast.error(
+          `You have reached your document upload limit (${documents.limit}). Please upgrade or wait for your limit to reset.`,
+          {
+            duration: 4000,
+            position: "top-right",
+            style: {
+              background: "#333",
+              color: "#fff",
+            },
+          }
+        );
+        setUploadedFile(null);
+        setUploadedFileName(null);
+        setIsLoading(false);
+        setError(`Document limit reached (${documents.current}/${documents.limit})`);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+    }
+
     setUploadingDocument(true);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > 1 * 1024 * 1024) {
         toast.error(
-          "File size exceeds 10MB limit. Please upload a smaller file.",
+          "File size exceeds 1MB limit. Please upload a smaller file.",
           {
             duration: 2000,
             position: "top-right",
@@ -101,7 +129,7 @@ export default function DocumentChatPage() {
         );
         setUploadedFile(null);
         setUploadedFileName(null);
-        setError("File size exceeds 10MB limit");
+        setError("File size exceeds 1MB limit");
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
@@ -319,7 +347,7 @@ export default function DocumentChatPage() {
                 Drag and drop your file here, or click to browse
               </p>
               <p className="text-xs text-muted-foreground mb-6">
-                Supports PDF, DOCX, TXT (Max 10MB)
+                Supports PDF, DOCX, TXT (Max 1MB)
               </p>
               <div className="relative">
                 <Input

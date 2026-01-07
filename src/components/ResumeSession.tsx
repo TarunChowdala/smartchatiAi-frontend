@@ -66,8 +66,8 @@ interface ResumeSessionContextType {
   setJobDescription: (jobDescription: string) => void;
   resumeMode: "jd_resume" | "enhance_resume";
   setResumeMode: (mode: "jd_resume" | "enhance_resume") => void;
-  selectedTemplate: "modern" | "minimal" | "classic" | "creative";
-  setSelectedTemplate: (template: "modern" | "minimal" | "classic" | "creative") => void;
+  selectedTemplate: "modern" | "minimal" | "classic";
+  setSelectedTemplate: (template: "modern" | "minimal" | "classic") => void;
   resumeData: ResumeData | null;
   setResumeData: (data: ResumeData | null) => void;
   analysisResult: AnalysisResult | null;
@@ -91,7 +91,7 @@ export const ResumeSessionProvider = ({
 }) => {
   const [jobDescription, setJobDescription] = useState<string>("");
   const [resumeMode, setResumeMode] = useState<"jd_resume" | "enhance_resume">("enhance_resume");
-  const [selectedTemplate, setSelectedTemplate] = useState<"modern" | "minimal" | "classic" | "creative">("modern");
+  const [selectedTemplate, setSelectedTemplate] = useState<"modern" | "minimal" | "classic">("modern");
   const [resumeData, setResumeData] = useState<ResumeData | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [showTemplate, setShowTemplate] = useState(false);

@@ -60,22 +60,9 @@ import { useChatSessions } from "@/hooks/chat/useChatSessions";
 import { useSendMessage } from "@/hooks/chat/useSendMessage";
 import { useSessionMessages } from "@/hooks/chat/useSessionMessages";
 import { useDeleteSession } from "@/hooks/chat/useDeleteSession";
+import { useMyUsage } from "@/hooks/usage/useUsage";
 
-import {
-  collection,
-  doc,
-  setDoc,
-  serverTimestamp,
-  addDoc,
-  updateDoc,
-  getDocs,
-  query,
-  orderBy,
-} from "firebase/firestore";
-import { v4 as uuidv4 } from "uuid";
-import { db } from "../../lib/firebase";
 import { useCurrentSession, Message } from "../CurrentSession";
-import { auth } from "@/lib/firebase";
 
 interface ModelOption {
   id: string;
@@ -143,6 +130,7 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
 
   // React Query hooks
   const { data: sessionsData, isLoading: isLoadingSessions } = useChatSessions(50);
@@ -150,6 +138,7 @@ export default function ChatPage() {
   const sendMessageMutation = useSendMessage();
   const deleteSessionMutation = useDeleteSession();
   const { data: sessionMessagesData } = useSessionMessages(currentSessionId);
+  const { data: myUsageData } = useMyUsage();
 
   // const [chatHistory, setChatHistory] = useState([
   //   {
@@ -193,12 +182,14 @@ export default function ChatPage() {
       }));
       setMessages(loadedMessages);
       setIsChatStarted(loadedMessages.length > 0);
-    } else if (currentSessionId && !sessionMessagesData) {
+      setIsCreatingSession(false); // Session data loaded, stop optimistic mode
+    } else if (currentSessionId && !sessionMessagesData && !isCreatingSession) {
       // Clear messages if session exists but no data yet (loading state)
+      // BUT don't clear if we're in the middle of creating a new session
       setMessages([]);
       setIsChatStarted(false);
     }
-  }, [sessionMessagesData, currentSessionId]);
+  }, [sessionMessagesData, currentSessionId, isCreatingSession]);
 
   const handleSessionClick = (session: Session) => {
     setCurrentSessionId(session.session_id);
@@ -245,6 +236,7 @@ export default function ChatPage() {
     setCurrentSessionId("");
     setMessages([]);
     setIsChatStarted(false);
+    setIsCreatingSession(false);
   };
 
   // Initialize and select the best voice
@@ -280,37 +272,6 @@ export default function ChatPage() {
   //   }
   // }, []);
 
-  const startNewSession = async (session_name: any, message: any) => {
-    if (!profile?.id) {
-      throw new Error("User profile not loaded. Please wait and try again.");
-    }
-
-    const session_id = uuidv4();
-    const session_ref = doc(db, "sessions", session_id);
-
-    // Step 1: Create session doc with session_name
-
-    await setDoc(session_ref, {
-      session_id,
-      user_id: profile.id,
-      session_name,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-      last_message: message,
-    });
-
-    // Step 2: Add first message to subcollection
-    const messagesRef = collection(session_ref, "messages");
-    await addDoc(messagesRef, {
-      content: message,
-      sender: "user",
-      timestamp: serverTimestamp(),
-      type: "text",
-    });
-
-    return session_id;
-  };
-
   // sending message to llm
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -323,17 +284,39 @@ export default function ChatPage() {
       return;
     }
 
-    // Create new session if one doesn't exist
-    let sessionId = currentSessionId;
-    const isNewSession = !sessionId;
-    if (!sessionId) {
-      const sessionName = generateSessionName(input);
-      sessionId = await startNewSession(sessionName, input);
-      setCurrentSessionId(sessionId);
-      setIsChatStarted(true);
+    // Check usage limits before creating new session
+    const isNewSession = !currentSessionId;
+    if (isNewSession && myUsageData?.usage) {
+      const { sessions } = myUsageData.usage;
+      if (sessions.limit !== "unlimited" && sessions.current >= sessions.limit) {
+        toast.error(
+          `You have reached your chat session limit (${sessions.limit}). Please upgrade or wait for your limit to reset.`,
+          {
+            duration: 4000,
+          }
+        );
+        return;
+      }
     }
 
-    // Add user message
+    // Check message limit per session
+    if (myUsageData?.usage) {
+      const { messages_per_session_limit } = myUsageData.usage;
+      if (messages_per_session_limit !== "unlimited") {
+        const currentMessageCount = messages.filter(m => m.sender === "user").length;
+        if (currentMessageCount >= messages_per_session_limit) {
+          toast.error(
+            `You have reached the message limit for this session (${messages_per_session_limit} messages). Please start a new session.`,
+            {
+              duration: 4000,
+            }
+          );
+          return;
+        }
+      }
+    }
+
+    // Add user message to UI
     const userMessage: Message = {
       id: Date.now().toString(),
       content: input,
@@ -342,41 +325,28 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Get messagesRef for storing messages
-    const messagesRef = collection(
-      db,
-      "sessions",
-      sessionId,
-      "messages"
-    );
-
-    if (!isNewSession) {
-      await addDoc(messagesRef, {
-        id: uuidv4(),
-        content: input,
-        sender: "user",
-        timestamp: serverTimestamp(),
-        type: "text",
-      });
+    // Mark that we're creating a new session to prevent message clearing
+    if (isNewSession) {
+      setIsCreatingSession(true);
     }
 
-    //Updating the current session with latest info
-    const sessionRef = doc(db, "sessions", sessionId);
-    const messageInput = input; // Save input before clearing
-    await updateDoc(sessionRef, {
-      last_message: messageInput,
-      updated_at: serverTimestamp(),
-    });
-
+    const messageInput = input;
     setInput("");
 
     try {
+      // Backend handles session creation and message storage
       const response = await sendMessageMutation.mutateAsync({
         user_id: profile.id,
         message: messageInput,
         model_name: selectedModel,
-        session_id: sessionId,
+        session_id: currentSessionId || null,
       });
+
+      // Update session ID if this was a new session
+      if (isNewSession && response.session_id) {
+        setCurrentSessionId(response.session_id);
+        setIsChatStarted(true);
+      }
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -389,18 +359,6 @@ export default function ChatPage() {
       }, 1000);
       setMessages((prev) => [...prev, aiMessage]);
 
-      await addDoc(messagesRef, {
-        id: uuidv4(),
-        content: response?.reply,
-        sender: "assistant",
-        timestamp: serverTimestamp(),
-        type: "text",
-      });
-
-      await updateDoc(sessionRef, {
-        last_message: response?.reply,
-        updated_at: serverTimestamp(),
-      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "An error occurred";
@@ -414,6 +372,11 @@ export default function ChatPage() {
         sender: "assistant",
       };
       setMessages((prev) => [...prev, errorMessageObj]);
+      
+      // Reset session creation flag on error
+      if (isNewSession) {
+        setIsCreatingSession(false);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -454,15 +417,6 @@ export default function ChatPage() {
     return `Chat from ${dateStr}`;
   };
 
-  const generateSessionName = (message: string): string => {
-    // Truncate message to 50 characters for session name
-    const maxLength = 50;
-    const trimmed = message.trim();
-    if (trimmed.length <= maxLength) {
-      return trimmed;
-    }
-    return trimmed.substring(0, maxLength).trim() + "...";
-  };
 
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full">

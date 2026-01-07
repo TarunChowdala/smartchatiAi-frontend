@@ -21,6 +21,69 @@ export interface GenerateResumeResponse {
   [key: string]: any; // Response can be various formats (JSON object, nested, or HTML string)
 }
 
+export interface GeneratePDFRequest {
+  template_id: "modern" | "minimal" | "classic";
+  resume_data: {
+    basics?: {
+      full_name: string;
+      title?: string;
+      location?: {
+        city?: string;
+        region?: string;
+        country?: string;
+      };
+      contact?: {
+        email?: string;
+        phone?: string;
+        linkedin?: string;
+        github?: string;
+        portfolio?: string;
+      };
+    };
+    summary?: {
+      headline?: string;
+      highlights?: string[];
+    };
+    experience?: Array<{
+      company: string;
+      role: string;
+      location?: string;
+      employment_type?: string;
+      start_date?: string;
+      end_date?: string | null;
+      is_current?: boolean;
+      summary?: string;
+      highlights?: string[];
+      tech_stack?: string[];
+    }>;
+    projects?: Array<{
+      name: string;
+      type?: string;
+      link?: string;
+      description?: string;
+      highlights?: string[];
+      tech_stack?: string[];
+    }>;
+    education?: Array<{
+      institution: string;
+      degree: string;
+      location?: string;
+      start_date?: string;
+      end_date?: string;
+      gpa?: string;
+      highlights?: string[];
+    }>;
+    skills?: {
+      categories?: Array<{
+        name: string;
+        items: string[];
+      }>;
+    };
+    certifications?: string[];
+    achievements?: string[];
+  };
+}
+
 export const resumeService = {
   compareResumeJD: async (data: CompareResumeRequest): Promise<CompareResumeResponse> => {
     const formData = new FormData();
@@ -47,6 +110,23 @@ export const resumeService = {
           "Content-Type": "application/json",
         },
         timeout: 180000, // 3 minutes timeout for generation
+      }
+    );
+    return response.data;
+  },
+  generatePDF: async (data: GeneratePDFRequest): Promise<Blob> => {
+    const response = await api.post(
+      "/resume/generate-pdf",
+      {
+        template_id: data.template_id,
+        resume_data: data.resume_data,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        responseType: "blob",
+        timeout: 180000, // 3 minutes timeout
       }
     );
     return response.data;

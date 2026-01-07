@@ -1,0 +1,559 @@
+.modern-resume {
+  width: 210mm;
+  max-width: 100%;
+  margin: auto;
+  padding: 28px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11.5pt;
+  color: #111;
+  line-height: 1.5;
+  background: white;
+}
+
+.modern-header {
+  margin-bottom: 0;
+}
+
+.modern-name {
+  font-size: 24pt;
+  margin: 0 0 4px 0;
+  font-weight: bold;
+  color: #111;
+}
+
+.modern-title {
+  font-size: 11pt;
+  color: #555;
+  margin: 0;
+}
+
+.modern-contact {
+  font-size: 10.5pt;
+  color: #444;
+  margin: 0;
+}
+
+.modern-contact span::after {
+  content: ' | ';
+  margin: 0;
+}
+
+.modern-contact span:last-child::after {
+  content: '';
+}
+
+.modern-section {
+  margin-top: 16px;
+}
+
+.modern-section-title {
+  font-size: 14pt;
+  margin-top: 20px;
+  margin-bottom: 0;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 4px;
+  font-weight: bold;
+  color: #111;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.modern-section-content {
+  color: #111;
+}
+
+.modern-summary-headline {
+  font-weight: bold;
+  font-size: 11.5pt;
+  margin-bottom: 0;
+  color: #111;
+}
+
+.modern-list {
+  padding-left: 16px;
+  margin: 6px 0;
+  list-style-type: disc;
+}
+
+.modern-list li {
+  margin-bottom: 4px;
+  line-height: 1.5;
+  color: #111;
+}
+
+.modern-experience-item,
+.modern-project-item,
+.modern-education-item {
+  margin-bottom: 12px;
+}
+
+.modern-exp-header {
+  display: block;
+  margin-bottom: 0;
+}
+
+.modern-exp-left {
+  display: block;
+}
+
+.modern-exp-role,
+.modern-edu-degree {
+  font-size: 11.5pt;
+  font-weight: bold;
+  color: #111;
+  margin: 0 0 0 0;
+}
+
+.modern-exp-company,
+.modern-edu-university {
+  font-size: 10.5pt;
+  color: #444;
+  margin: 0;
+}
+
+.modern-exp-duration,
+.modern-edu-duration {
+  font-size: 10.5pt;
+  color: #444;
+  white-space: normal;
+  font-weight: normal;
+  display: inline;
+}
+
+.modern-exp-duration::before {
+  content: ' | ';
+}
+
+.modern-project-header {
+  margin-bottom: 0;
+}
+
+.modern-project-title {
+  display: inline;
+  font-size: 11.5pt;
+  font-weight: bold;
+  color: #111;
+  margin: 0;
+}
+
+.modern-project-link {
+  margin-left: 0;
+  color: #111;
+  text-decoration: none;
+  font-size: 11.5pt;
+}
+
+.modern-skills-grid {
+  display: block;
+}
+
+.modern-skill-category {
+  font-size: 11.5pt;
+  color: #111;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.modern-skill-category strong {
+  color: #111;
+  font-weight: bold;
+}
+
+.minimal-resume {
+  width: 210mm;
+  max-width: 100%;
+  margin: auto;
+  padding: 24px;
+  font-family: "Times New Roman", serif;
+  font-size: 11pt;
+  color: #000;
+  line-height: 1.5;
+  background: white;
+}
+
+.minimal-header {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.minimal-name {
+  font-size: 22pt;
+  margin: 0;
+  font-weight: bold;
+  color: #000;
+}
+
+.minimal-title {
+  font-size: 11pt;
+  color: #000;
+  margin: 0;
+}
+
+.minimal-contact {
+  font-size: 11pt;
+  color: #000;
+  margin: 0;
+}
+
+.minimal-contact span::after {
+  content: ' | ';
+  margin: 0;
+}
+
+.minimal-contact span:last-child::after {
+  content: '';
+}
+
+.minimal-section {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.minimal-section-title {
+  font-size: 13pt;
+  margin-top: 18px;
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+  font-weight: bold;
+  color: #000;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.minimal-section-content {
+  color: #000;
+}
+
+.minimal-summary-headline {
+  font-weight: bold;
+  font-size: 11pt;
+  margin-bottom: 0;
+  color: #000;
+}
+
+.minimal-list {
+  padding-left: 18px;
+  margin: 0;
+  list-style-type: disc;
+}
+
+.minimal-list li {
+  margin-bottom: 3px;
+  line-height: 1.5;
+  color: #000;
+}
+
+.minimal-experience-item,
+.minimal-project-item,
+.minimal-education-item {
+  margin-bottom: 0;
+}
+
+.minimal-exp-header {
+  display: block;
+  margin-bottom: 0;
+}
+
+.minimal-exp-role,
+.minimal-edu-degree {
+  font-size: 11pt;
+  font-weight: normal;
+  color: #000;
+  margin: 0;
+}
+
+.minimal-exp-role strong,
+.minimal-edu-degree strong {
+  font-weight: bold;
+}
+
+.minimal-exp-company,
+.minimal-edu-university {
+  font-size: 11pt;
+  color: #000;
+  margin: 0;
+  font-style: normal;
+}
+
+.minimal-exp-duration,
+.minimal-edu-duration {
+  font-size: 11pt;
+  color: #000;
+  white-space: normal;
+  display: inline;
+}
+
+.minimal-exp-duration::before {
+  content: ' | ';
+}
+
+.minimal-project-header {
+  margin-bottom: 0;
+}
+
+.minimal-project-title {
+  font-size: 11pt;
+  font-weight: normal;
+  color: #000;
+  margin: 0;
+}
+
+.minimal-project-title strong {
+  font-weight: bold;
+}
+
+.minimal-project-link {
+  margin-left: 0;
+  color: #000;
+  text-decoration: none;
+  font-size: 11pt;
+}
+
+.minimal-skills-list {
+  font-size: 11pt;
+  color: #000;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.classic-resume {
+  width: 210mm;
+  max-width: 100%;
+  margin: auto;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  font-size: 11.5pt;
+  color: #111;
+  line-height: 1.5;
+  background: white;
+}
+
+.classic-header {
+  background: #111;
+  color: #fff;
+  padding: 22px;
+  margin-bottom: 0;
+}
+
+.classic-name {
+  font-size: 26pt;
+  font-weight: bold;
+  color: #fff;
+  margin: 0;
+}
+
+.classic-title {
+  font-size: 10.5pt;
+  color: #fff;
+  margin: 4px 0 0 0;
+  font-weight: normal;
+}
+
+.classic-contact {
+  font-size: 10.5pt;
+  color: #fff;
+  margin: 4px 0 0 0;
+}
+
+.classic-contact span::after {
+  content: ' | ';
+  margin: 0;
+}
+
+.classic-contact span:last-child::after {
+  content: '';
+}
+
+.classic-section {
+  padding: 20px;
+  margin-bottom: 0;
+}
+
+.classic-section-title {
+  font-size: 14pt;
+  margin-top: 0;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 0;
+  font-weight: bold;
+  color: #111;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.classic-section-content {
+  color: #111;
+}
+
+.classic-summary-headline {
+  font-weight: bold;
+  font-size: 11.5pt;
+  margin-bottom: 0;
+  color: #111;
+}
+
+.classic-list {
+  padding-left: 16px;
+  margin: 0;
+  list-style-type: disc;
+}
+
+.classic-list li {
+  margin-bottom: 4px;
+  line-height: 1.5;
+  color: #111;
+}
+
+.classic-experience-item,
+.classic-project-item,
+.classic-education-item {
+  margin-bottom: 0;
+}
+
+.classic-exp-header {
+  display: block;
+  margin-bottom: 0;
+}
+
+.classic-exp-left {
+  display: block;
+}
+
+.classic-exp-role,
+.classic-edu-degree {
+  font-size: 11.5pt;
+  font-weight: normal;
+  color: #111;
+  margin: 0;
+}
+
+.classic-exp-role strong,
+.classic-edu-degree strong {
+  font-weight: bold;
+}
+
+.classic-exp-company,
+.classic-edu-university {
+  font-size: 11.5pt;
+  color: #111;
+  margin: 0;
+  font-weight: normal;
+}
+
+.classic-exp-duration,
+.classic-edu-duration {
+  font-size: 11.5pt;
+  color: #111;
+  white-space: normal;
+  font-weight: normal;
+  display: inline;
+}
+
+.classic-exp-duration::before {
+  content: ' | ';
+}
+
+.classic-project-header {
+  margin-bottom: 0;
+}
+
+.classic-project-title {
+  font-size: 11.5pt;
+  font-weight: normal;
+  color: #111;
+  margin: 0;
+}
+
+.classic-project-title strong {
+  font-weight: bold;
+}
+
+.classic-project-link {
+  margin-left: 0;
+  color: #111;
+  text-decoration: none;
+  font-size: 11.5pt;
+}
+
+.classic-skills-grid {
+  display: block;
+}
+
+.classic-skill-category {
+  font-size: 11.5pt;
+  color: #111;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.classic-skill-category strong {
+  color: #111;
+  font-weight: bold;
+  min-width: 0;
+  display: inline;
+}
+
+@media (max-width: 768px) {
+  .modern-resume,
+  .minimal-resume,
+  .classic-resume {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .modern-name,
+  .minimal-name,
+  .classic-name {
+    font-size: 20pt;
+  }
+
+  .modern-exp-header,
+  .minimal-exp-header,
+  .classic-exp-header {
+    flex-direction: column;
+  }
+
+  .modern-contact,
+  .minimal-contact,
+  .classic-contact {
+    flex-direction: column;
+  }
+
+  .modern-contact span::after,
+  .minimal-contact span::after,
+  .classic-contact span::after {
+    content: '';
+  }
+}
+
+@media print {
+  .modern-resume,
+  .minimal-resume,
+  .classic-resume {
+    width: 210mm;
+    padding: 0;
+    max-width: 100%;
+  }
+
+  .modern-section,
+  .minimal-section,
+  .classic-section {
+    page-break-inside: avoid;
+  }
+
+  .modern-experience-item,
+  .minimal-experience-item,
+  .classic-experience-item,
+  .modern-project-item,
+  .minimal-project-item,
+  .classic-project-item {
+    page-break-inside: avoid;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
