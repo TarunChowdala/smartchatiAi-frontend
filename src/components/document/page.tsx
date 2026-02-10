@@ -2,7 +2,7 @@ import type React from "react";
 import "./styles.css";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, User, Bot, Loader2, Upload, File, X, Trash2 } from "lucide-react";
+import { Send, User, Bot, Loader2, Upload, File, X, Trash2, Key, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,11 +21,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import MessageContent from "../chat/MessageContent";
 import toast, { Toaster } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import { useUploadDocument, useDocumentStatus, useAskDocument, useDeleteDocument } from "@/hooks/document/useDocument";
 import { useDocumentSession, DocumentMessage } from "../DocumentSession";
 import { useMyUsage } from "@/hooks/usage/useUsage";
+import { useGetGeminiApiKey } from "@/hooks/auth/useAuth";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function DocumentChatPage() {
+  const navigate = useNavigate();
   const {
     currentDocumentId,
     setCurrentDocumentId,
@@ -51,6 +55,11 @@ export default function DocumentChatPage() {
   const askDocumentMutation = useAskDocument();
   const deleteDocumentMutation = useDeleteDocument();
   const { data: myUsageData } = useMyUsage();
+  const { data: geminiApiKeyData, isLoading: geminiApiKeyLoading } = useGetGeminiApiKey();
+  const hasGeminiKeyStored =
+    geminiApiKeyData?.has_key === true ||
+    geminiApiKeyData?.has_gemini_key === true ||
+    (geminiApiKeyData?.gemini_api_key != null && geminiApiKeyData.gemini_api_key !== "");
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -361,6 +370,7 @@ export default function DocumentChatPage() {
                 <Button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={!geminiApiKeyLoading && !hasGeminiKeyStored}
                 >
                   Select File
                 </Button>
@@ -512,16 +522,46 @@ export default function DocumentChatPage() {
               <div ref={messagesEndRef} />
             </CardContent>
 
+            {!geminiApiKeyLoading && !hasGeminiKeyStored && (
+              <div className="px-4 pb-2">
+                <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900">
+                  <Key className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <AlertDescription className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm">
+                      Add your Gemini API key to unlock document chat.
+                    </span>
+                    <a
+                      href="https://youtu.be/ne3SLfF_gk0?si=M27e3nLopn9AxAE6"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs md:text-sm text-amber-700 dark:text-amber-300 underline underline-offset-2"
+                    >
+                      Watch how to add your Gemini API key
+                    </a>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="gap-1.5 shrink-0"
+                      onClick={() => navigate("/dashboard/settings")}
+                    >
+                      <Settings className="h-4 w-4" />
+                      Go to Settings
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
             <div className="p-4 border-t input-element-container">
               <form onSubmit={handleSubmit} className="flex gap-2">
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about the document..."
+                  placeholder={!hasGeminiKeyStored && !geminiApiKeyLoading ? "Add Gemini API key in Settings to chat" : "Ask about the document..."}
                   className="flex-1"
-                  disabled={isLoading}
+                  disabled={isLoading || (!geminiApiKeyLoading && !hasGeminiKeyStored)}
                 />
-                <Button type="submit" disabled={isLoading || !input.trim()}>
+                <Button type="submit" disabled={isLoading || !input.trim() || (!geminiApiKeyLoading && !hasGeminiKeyStored)}>
                   <Send className="h-4 w-4" />
                   <span className="sr-only">Send</span>
                 </Button>

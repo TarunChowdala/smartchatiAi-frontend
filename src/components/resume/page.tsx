@@ -14,6 +14,8 @@ import {
   Search,
   Wand2,
   Download,
+  Key,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,12 +25,15 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import toast, { Toaster } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import "./styles.css";
 import "./templates/ResumeTemplates.css";
 import { useCompareResumeJD, useGenerateResume, useGeneratePDF } from "@/hooks/resume/useResume";
 import { useResumeSession, AnalysisResult } from "../ResumeSession";
 import { useMyUsage } from "@/hooks/usage/useUsage";
+import { useGetGeminiApiKey } from "@/hooks/auth/useAuth";
 import { getTemplate, type TemplateType, type ResumeData as TemplateResumeData } from "./templates";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Resume JSON Data Types - Old Format (for backward compatibility)
 type ResumeContact = {
@@ -420,6 +425,7 @@ const transformOldFormatToNew = (oldData: ResumeData): NewResumeData => {
 };
 
 export default function ResumePage() {
+  const navigate = useNavigate();
   const {
     jobDescription,
     setJobDescription,
@@ -452,6 +458,11 @@ export default function ResumePage() {
   const generateResumeMutation = useGenerateResume();
   const generatePDFMutation = useGeneratePDF();
   const { data: myUsageData } = useMyUsage();
+  const { data: geminiApiKeyData, isLoading: geminiApiKeyLoading } = useGetGeminiApiKey();
+  const hasGeminiKeyStored =
+    geminiApiKeyData?.has_key === true ||
+    geminiApiKeyData?.has_gemini_key === true ||
+    (geminiApiKeyData?.gemini_api_key != null && geminiApiKeyData.gemini_api_key !== "");
 
   const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1180,6 +1191,36 @@ export default function ResumePage() {
       {!analysisResult ? (
         <Card className="flex-1 flex flex-col">
           <CardContent className="flex flex-col items-center justify-center h-full p-6 resume-card-content">
+            {!geminiApiKeyLoading && !hasGeminiKeyStored && (
+              <div className="w-full max-w-6xl mb-6">
+                <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900">
+                  <Key className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <AlertDescription className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm">
+                      Add your Gemini API key to unlock resume analysis and generation.
+                    </span>
+                    <a
+                      href="https://youtu.be/ne3SLfF_gk0?si=M27e3nLopn9AxAE6"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs md:text-sm text-amber-700 dark:text-amber-300 underline underline-offset-2"
+                    >
+                      Watch how to add your Gemini API key
+                    </a>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="gap-1.5 shrink-0"
+                      onClick={() => navigate("/dashboard/settings")}
+                    >
+                      <Settings className="h-4 w-4" />
+                      Go to Settings
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
             <div className="w-full max-w-6xl space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Job Description Input */}
@@ -1192,11 +1233,12 @@ export default function ResumePage() {
                   </Label>
                   <Textarea
                     id="job-description"
-                    placeholder="Paste the job description here..."
+                    placeholder={!hasGeminiKeyStored && !geminiApiKeyLoading ? "Add Gemini API key in Settings to use resume features" : "Paste the job description here..."}
                     value={jobDescription}
                     onChange={(e) => setJobDescription(e.target.value)}
                     className="min-h-[120px] resize-none flex-1"
                     style={{ overflow: "none", scrollbarWidth: "thin" }}
+                    disabled={!geminiApiKeyLoading && !hasGeminiKeyStored}
                   />
                   <p className="text-xs text-muted-foreground">
                     Enter the job description to analyze how well your resume
@@ -1225,7 +1267,10 @@ export default function ResumePage() {
                     id="resume-upload"
                   />
                   <Label htmlFor="resume-upload" asChild>
-                    <Button onClick={() => resumeInputRef.current?.click()}>
+                    <Button 
+                      onClick={() => resumeInputRef.current?.click()}
+                      disabled={!geminiApiKeyLoading && !hasGeminiKeyStored}
+                    >
                       Select PDF File
                     </Button>
                   </Label>
@@ -1268,7 +1313,7 @@ export default function ResumePage() {
                       >
                         <Button
                           onClick={analyzeResume}
-                          disabled={isAnalyzing || !jobDescription.trim()}
+                          disabled={isAnalyzing || !jobDescription.trim() || (!geminiApiKeyLoading && !hasGeminiKeyStored)}
                           className="w-full"
                           size="lg"
                         >
@@ -1692,7 +1737,7 @@ export default function ResumePage() {
                               type="button"
                               className="w-full"
                               size="lg"
-                              disabled={generatingResume}
+                              disabled={generatingResume || (!geminiApiKeyLoading && !hasGeminiKeyStored)}
                             >
                               {generatingResume ? (
                                 <>
