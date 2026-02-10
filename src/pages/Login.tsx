@@ -131,15 +131,19 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
+        <CardHeader className="space-y-4 flex flex-col items-center pb-6">
+          <div className="p-3 bg-primary/10 rounded-full ring-1 ring-primary/20">
             <Brain className="h-8 w-8" />
           </div>
-          <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
+          <div className="space-y-2 text-center">
+            <CardTitle className="text-2xl font-bold tracking-tight">
+              Welcome to SmartChat AI
+            </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -178,8 +182,8 @@ export default function LoginPage() {
                   )}
                 </Button>
               </div>
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            </div> */}
+            {/* <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -188,7 +192,7 @@ export default function LoginPage() {
               ) : (
                 "Log in"
               )}
-            </Button>
+            </Button> */}
             <Button
               type="button"
               className="w-full flex items-center justify-center gap-2"
@@ -203,12 +207,12 @@ export default function LoginPage() {
               />
               Continue with Google
             </Button>
-            <div className="text-center text-sm text-muted-foreground">
+            {/* <div className="text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Link to="/signup" className="text-primary hover:underline">
                 Sign up
               </Link>
-            </div>
+            </div> */}
           </form>
         </CardContent>
       </Card>
