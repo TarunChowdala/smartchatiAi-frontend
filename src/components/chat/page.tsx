@@ -24,6 +24,8 @@ import {
   Menu,
   X,
   Trash2,
+  Key,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,13 +57,15 @@ import MessageContent from "./MessageContent";
 //   SelectValue,
 // } from "@radix-ui/react-select";
 import toast, { Toaster } from "react-hot-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom";
 import { useProfile } from "../ProfileContext";
 import { useChatSessions } from "@/hooks/chat/useChatSessions";
 import { useSendMessage } from "@/hooks/chat/useSendMessage";
 import { useSessionMessages } from "@/hooks/chat/useSessionMessages";
 import { useDeleteSession } from "@/hooks/chat/useDeleteSession";
 import { useMyUsage } from "@/hooks/usage/useUsage";
-
+import { useGetGeminiApiKey } from "@/hooks/auth/useAuth";
 import { useCurrentSession, Message } from "../CurrentSession";
 
 interface ModelOption {
@@ -103,7 +107,13 @@ const modelsList: ModelOption[] = [
 ];
 
 export default function ChatPage() {
+  const navigate = useNavigate();
   const { profile } = useProfile();
+  const { data: geminiApiKeyData, isLoading: geminiApiKeyLoading } = useGetGeminiApiKey();
+  const hasGeminiKeyStored =
+    geminiApiKeyData?.has_key === true ||
+    geminiApiKeyData?.has_gemini_key === true ||
+    (geminiApiKeyData?.gemini_api_key != null && geminiApiKeyData.gemini_api_key !== "");
   const {
     currentSessionId,
     setCurrentSessionId,
@@ -645,6 +655,36 @@ export default function ChatPage() {
           )}
           <div ref={messagesEndRef} />
         </CardContent>
+        {!geminiApiKeyLoading && !hasGeminiKeyStored && (
+          <div className="px-4 pb-2">
+            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900">
+              <Key className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="flex flex-wrap items-center gap-2">
+                <span className="text-sm">
+                  Add your Gemini API key to unlock Gemini-powered chat.
+                </span>
+                <a
+                  href="https://youtu.be/ne3SLfF_gk0?si=M27e3nLopn9AxAE6"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs md:text-sm text-amber-700 dark:text-amber-300 underline underline-offset-2"
+                >
+                  Watch how to add your Gemini API key
+                </a>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="gap-1.5 shrink-0"
+                  onClick={() => navigate("/dashboard/settings")}
+                >
+                  <Settings className="h-4 w-4" />
+                  Go to Settings
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
         <div
           className="p-4 input-element-container"
           style={{ position: "relative" }}
@@ -822,11 +862,11 @@ export default function ChatPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setInput(e.target.value)
                 }
-                placeholder="Type your message..."
+                placeholder={!hasGeminiKeyStored && !geminiApiKeyLoading ? "Add Gemini API key in Settings to chat" : "Type your message..."}
                 className="flex-1"
-                disabled={isLoading}
+                disabled={isLoading || (!geminiApiKeyLoading && !hasGeminiKeyStored)}
               />
-              <Button type="submit" disabled={isLoading || !input.trim()}>
+              <Button type="submit" disabled={isLoading || !input.trim() || (!geminiApiKeyLoading && !hasGeminiKeyStored)}>
                 <Send className="h-4 w-4" />
                 <span className="sr-only">Send</span>
               </Button>

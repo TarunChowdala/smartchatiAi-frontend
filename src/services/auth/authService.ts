@@ -47,6 +47,14 @@ export interface UpdatePasswordRequest {
   newPassword: string;
 }
 
+export interface GeminiApiKeyResponse {
+  gemini_api_key?: string;
+  /** True when a key is stored (backend may omit the actual key for security) */
+  has_key?: boolean;
+  /** Backend field: true when a Gemini key is stored */
+  has_gemini_key?: boolean;
+}
+
 export const authService = {
   login: async (data: LoginRequest): Promise<LoginResponse> => {
     const response = await api.post("/auth/login", {
@@ -84,6 +92,22 @@ export const authService = {
       currentPassword: encryptPassword(data.currentPassword),
       newPassword: encryptPassword(data.newPassword),
     });
+  },
+
+  getGeminiApiKey: async (): Promise<GeminiApiKeyResponse> => {
+    const response = await api.get("/auth/settings/gemini-api-key");
+    return response.data;
+  },
+
+  setGeminiApiKey: async (gemini_api_key: string): Promise<GeminiApiKeyResponse> => {
+    const response = await api.post("/auth/settings/gemini-api-key", {
+      gemini_api_key: encryptPassword(gemini_api_key),
+    });
+    return response.data;
+  },
+
+  deleteGeminiApiKey: async (): Promise<void> => {
+    await api.delete("/auth/settings/gemini-api-key");
   },
 };
 

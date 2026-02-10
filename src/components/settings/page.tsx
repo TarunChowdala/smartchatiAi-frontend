@@ -39,11 +39,12 @@ import {
   Send,
   CheckCircle,
   Clock,
+  Trash2,
 } from "lucide-react";
 import { useProfile } from "../ProfileContext";
 import api from "@/lib/api";
 import toast, { Toaster } from "react-hot-toast";
-import { useUpdateMe, useUpdatePassword } from "@/hooks/auth/useAuth";
+import { useUpdateMe, useUpdatePassword, useGetGeminiApiKey, useSetGeminiApiKey, useDeleteGeminiApiKey } from "@/hooks/auth/useAuth";
 import { useMyUsage, useAllUsers, useResetUserUsage, useUserUsage } from "@/hooks/usage/useUsage";
 import { useSubmitQuery, useMyQueries, useAllQueries, useReplyToQuery, useUpdateQueryStatus } from "@/hooks/help/useHelp";
 import {
@@ -93,6 +94,17 @@ export default function SettingsPage() {
   const updatePasswordMutation = useUpdatePassword();
   const [updatingDetails, setUpdatingDetails] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+
+  const { data: geminiApiKeyData, isLoading: geminiApiKeyLoading, refetch: refetchGeminiApiKey } = useGetGeminiApiKey();
+  const setGeminiApiKeyMutation = useSetGeminiApiKey();
+  const deleteGeminiApiKeyMutation = useDeleteGeminiApiKey();
+  const [geminiApiKeyInput, setGeminiApiKeyInput] = useState("");
+  const [showRemoveGeminiKeyDialog, setShowRemoveGeminiKeyDialog] = useState(false);
+
+  const hasGeminiKeyStored =
+    geminiApiKeyData?.has_key === true ||
+    geminiApiKeyData?.has_gemini_key === true ||
+    (geminiApiKeyData?.gemini_api_key != null && geminiApiKeyData.gemini_api_key !== "");
 
   // Usage stats hooks
   const { data: myUsageData, isLoading: usageLoading } = useMyUsage();
@@ -332,8 +344,39 @@ export default function SettingsPage() {
     );
   };
 
+  const handleSaveGeminiApiKey = async () => {
+    const key = geminiApiKeyInput.trim();
+    if (!key) {
+      toast.error("Please enter a Gemini API key");
+      return;
+    }
+    try {
+      await setGeminiApiKeyMutation.mutateAsync(key);
+      setGeminiApiKeyInput("");
+      toast.success("Gemini API key saved successfully");
+      await refetchGeminiApiKey();
+    } catch (error: any) {
+      console.error("Error saving Gemini API key:", error);
+      const message = error.response?.data?.detail ?? "Failed to save Gemini API key";
+      toast.error(typeof message === "string" ? message : "Failed to save Gemini API key");
+    }
+  };
+
+  const handleRemoveGeminiApiKey = async () => {
+    try {
+      await deleteGeminiApiKeyMutation.mutateAsync();
+      setShowRemoveGeminiKeyDialog(false);
+      toast.success("Gemini API key removed");
+      await refetchGeminiApiKey();
+    } catch (error: any) {
+      console.error("Error removing Gemini API key:", error);
+      const message = error.response?.data?.detail ?? "Failed to remove Gemini API key";
+      toast.error(typeof message === "string" ? message : "Failed to remove Gemini API key");
+    }
+  };
+
   return (
-    <div className="w-full px-4 md:px-6 lg:px-8 py-8">
+    <div className="w-full px-4 md:px-6 lg:px-8 py-8 overflow-y-auto custom-scrollbar">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -432,6 +475,86 @@ export default function SettingsPage() {
                     </>
                   ) : (
                     "Save Changes"
+                  )}
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="h-5 w-5" /> Gemini API Key
+                </CardTitle>
+                <CardDescription>
+                  Store your Gemini API key to use Gemini-powered features. Your key is stored securely and only sent to our backend.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {geminiApiKeyLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Loading...</span>
+                  </div>
+                ) : (
+                  <>
+                    {hasGeminiKeyStored && (
+                      <Alert className="border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-900">
+                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        <AlertDescription>
+                          <span className="font-medium text-green-800 dark:text-green-200">Gemini API key is already added.</span>
+                          {" "}
+                          Enter a new key below to replace it.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="gemini-api-key">API Key</Label>
+                      <Input
+                        id="gemini-api-key"
+                        type="password"
+                        placeholder="Enter your Gemini API key"
+                        value={geminiApiKeyInput}
+                        onChange={(e) => setGeminiApiKeyInput(e.target.value)}
+                        autoComplete="off"
+                      />
+                    </div>
+                  </>
+                )}
+              </CardContent>
+              <CardFooter className="flex justify-between flex-wrap gap-2">
+                <div className="flex gap-2">
+                  {hasGeminiKeyStored && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowRemoveGeminiKeyDialog(true)}
+                      disabled={geminiApiKeyLoading || deleteGeminiApiKeyMutation.isPending}
+                    >
+                      {deleteGeminiApiKeyMutation.isPending ? (
+                        <>
+                          <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                          Removing...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Remove API Key
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <Button
+                  onClick={handleSaveGeminiApiKey}
+                  disabled={geminiApiKeyLoading || setGeminiApiKeyMutation.isPending || !geminiApiKeyInput.trim()}
+                >
+                  {setGeminiApiKeyMutation.isPending ? (
+                    <>
+                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save API Key"
                   )}
                 </Button>
               </CardFooter>
@@ -1452,6 +1575,44 @@ export default function SettingsPage() {
                   <>
                     <Send className="h-4 w-4 mr-2" />
                     Send Reply
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Remove Gemini API Key confirmation */}
+        <Dialog open={showRemoveGeminiKeyDialog} onOpenChange={setShowRemoveGeminiKeyDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Remove Gemini API Key</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to remove your saved Gemini API key? You can add a new one anytime from settings.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowRemoveGeminiKeyDialog(false)}
+                disabled={deleteGeminiApiKeyMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleRemoveGeminiApiKey}
+                disabled={deleteGeminiApiKeyMutation.isPending}
+              >
+                {deleteGeminiApiKeyMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Removing...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Remove Key
                   </>
                 )}
               </Button>

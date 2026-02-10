@@ -116,7 +116,7 @@ export const resumeService = {
   },
   generatePDF: async (data: GeneratePDFRequest): Promise<Blob> => {
     const response = await api.post(
-      "/resume/generate-pdf",
+      "/resume/download?format=pdf",
       {
         template_id: data.template_id,
         resume_data: data.resume_data,
