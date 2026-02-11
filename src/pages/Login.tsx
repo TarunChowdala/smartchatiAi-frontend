@@ -131,15 +131,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4 flex flex-col items-center pb-6">
-          <div className="p-3 bg-primary/10 rounded-full ring-1 ring-primary/20">
+        <CardHeader className="space-y-1">
+          <div className="flex items-center justify-center mb-4">
             <Brain className="h-8 w-8" />
           </div>
-          <div className="space-y-2 text-center">
-            <CardTitle className="text-2xl font-bold tracking-tight">
-              Welcome to SmartChat AI
-            </CardTitle>
-          </div>
+          <CardTitle className="text-2xl text-center">Welcome to SmartChatAI</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -155,8 +151,8 @@ export default function LoginPage() {
                 }
                 required
               />
-            </div>
-            <div className="space-y-2">
+            </div> */}
+            {/* <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
@@ -182,8 +178,8 @@ export default function LoginPage() {
                   )}
                 </Button>
               </div>
-            </div> */}
-            {/* <Button type="submit" className="w-full" disabled={isLoading}>
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
